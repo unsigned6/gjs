@@ -36,6 +36,27 @@
 
 #include <jsapi.h>
 
+#ifdef DEBUG
+/* NOTE: In order for this to work and JS_DumpHeap to be available
+ * SpiderMonkey must have been compiled with --enable-debug.
+ *
+ * However using the configure option also fails several assertions in
+ * SpiderMonkey, most of them due to missing thread safety in GJS; when
+ * SpiderMonkey is compiled with JS_THREADSAFE most (all?) calls are supposed
+ * to be wrapped in JS_BeginRequest / JS_EndRequest which we're currently not
+ * doing at all. The simplest way to ignore the issue is to edit jsutil.h and
+ * forcefully disable assertions.
+ *
+ * Also DEBUG must be defined before including <jsapi.h> for JS_DumpHeap to be
+ * declared; none of the installed SpiderMonkey header or pkg-config files
+ * defines it.
+ */
+#include "mem.h"
+#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
 static void     gjs_context_dispose           (GObject               *object);
 static void     gjs_context_finalize          (GObject               *object);
 static GObject* gjs_context_constructor       (GType                  type,
@@ -92,6 +113,97 @@ enum {
 static GStaticMutex contexts_lock = G_STATIC_MUTEX_INIT;
 static GList *all_contexts = NULL;
 
+
+#ifdef DEBUG
+static char *dump_heap_output = NULL;
+static guint dump_heap_idle_id = 0;
+
+static void
+gjs_context_dump_heap(GjsContext *js_context, FILE *fp)
+{
+    JS_DumpHeap(js_context->context, fp,
+                NULL, 0,    /* start thing and kind */
+                NULL,       /* thing to find */
+                0xffff,     /* max depth */
+                NULL);      /* thing to ignore */
+}
+
+static void
+gjs_context_dump_heaps(void)
+{
+    static guint counter = 0;
+    char *filename;
+    FILE *fp;
+    GSList *l;
+
+    gjs_memory_report("signal handler", FALSE);
+
+    /* dump to sequential files to allow easier comparisons */
+    filename = g_strdup_printf("%s.%u.%u",
+                               dump_heap_output,
+                               (guint)getpid(),
+                               counter);
+    ++counter;
+
+    fp = fopen(filename, "w");
+    g_free(filename);
+
+    if (!fp)
+        return;
+
+    for (l = all_gjs_contexts; l != NULL; l = l->next) {
+        GjsContext *js_context = l->data;
+
+        gjs_context_dump_heap(js_context, fp);
+    }
+
+    fclose(fp);
+}
+
+static gboolean
+dump_heap_idle(gpointer user_data)
+{
+    dump_heap_idle_id = 0;
+
+    gjs_context_dump_heaps();
+
+    return FALSE;
+}
+
+static void
+dump_heap_signal_handler(int signum)
+{
+    if (dump_heap_idle_id == 0)
+        dump_heap_idle_id = g_idle_add_full(G_PRIORITY_HIGH_IDLE,
+                                            dump_heap_idle,
+                                            NULL, NULL);
+}
+#endif
+
+static void
+setup_dump_heap(void)
+{
+#ifdef DEBUG
+    static gboolean dump_heap_initialized = FALSE;
+    if (!dump_heap_initialized) {
+        const char *heap_output;
+
+        dump_heap_initialized = TRUE;
+
+        /* install signal handler only if environment variable is set */
+        heap_output = g_getenv("GJS_DEBUG_HEAP_OUTPUT");
+        if (heap_output != NULL) {
+            struct sigaction sa;
+
+            dump_heap_output = g_strdup(heap_output);
+
+            memset(&sa, 0, sizeof(sa));
+            sa.sa_handler = dump_heap_signal_handler;
+            sigaction(SIGUSR1, &sa, NULL);
+        }
+    }
+#endif
+}
 
 static JSBool
 gjs_log(JSContext *context,
@@ -551,6 +663,7 @@ gjs_context_constructor (GType                  type,
     g_static_mutex_unlock (&contexts_lock);
 
     all_gjs_contexts = g_slist_prepend(all_gjs_contexts, js_context);
+    setup_dump_heap();
 
     return object;
 }
