@@ -71,6 +71,8 @@ struct _GjsContextClass {
 
 G_DEFINE_TYPE(GjsContext, gjs_context, G_TYPE_OBJECT);
 
+static GSList *all_gjs_contexts = NULL;
+
 #if 0
 enum {
     LAST_SIGNAL
@@ -238,6 +240,8 @@ gjs_context_dispose(GObject *object)
         gjs_profiler_free(js_context->profiler);
         js_context->profiler = NULL;
     }
+
+    all_gjs_contexts = g_slist_remove(all_gjs_contexts, js_context);
 
     if (js_context->global != NULL) {
         JS_RemoveRoot(js_context->context, &js_context->global);
@@ -545,6 +549,8 @@ gjs_context_constructor (GType                  type,
     g_static_mutex_lock (&contexts_lock);
     all_contexts = g_list_prepend(all_contexts, object);
     g_static_mutex_unlock (&contexts_lock);
+
+    all_gjs_contexts = g_slist_prepend(all_gjs_contexts, js_context);
 
     return object;
 }
