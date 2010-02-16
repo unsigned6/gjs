@@ -208,6 +208,7 @@ gjs_callback_closure(ffi_cif *cif,
     if (!gjs_value_to_g_argument(invoke_info->context,
                                  rval,
                                  ret_type,
+                                 g_type_info_get_tag (ret_type),
                                  "callback",
                                  GJS_ARGUMENT_RETURN_VALUE,
                                  FALSE,
@@ -721,6 +722,7 @@ gjs_invoke_c_function(JSContext      *context,
             /* Free GArgument, the jsval should have ref'd or copied it */
             if (invoke_ok &&
                 !gjs_g_argument_release(context,
+                                        return_values[next_rval],
                                         g_callable_info_get_caller_owns((GICallableInfo*) info),
                                         return_info,
                                         &return_arg))
@@ -750,6 +752,7 @@ gjs_invoke_c_function(JSContext      *context,
             g_assert(in_args_pos < expected_in_argc + destroy_notify_argc);
 
             if (!gjs_g_argument_release_in_arg(context,
+                                               argv[i],
                                                g_arg_info_get_ownership_transfer(arg_info),
                                                arg_type_info,
                                                &in_args[in_args_pos]))
@@ -774,6 +777,7 @@ gjs_invoke_c_function(JSContext      *context,
             /* Free GArgument, the jsval should have ref'd or copied it */
             if (invoke_ok &&
                 !gjs_g_argument_release(context,
+                                        argv[i],
                                         g_arg_info_get_ownership_transfer(arg_info),
                                         arg_type_info,
                                         out_args[out_args_pos].v_pointer))

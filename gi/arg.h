@@ -49,6 +49,7 @@ JSBool gjs_value_to_arg   (JSContext  *context,
 JSBool gjs_value_to_g_argument (JSContext      *context,
                                 jsval           value,
                                 GITypeInfo     *type_info,
+                                GITypeTag       type_tag,
                                 const char     *arg_name,
                                 GjsArgumentType argument_type,
                                 GITransfer      transfer,
@@ -60,10 +61,12 @@ JSBool gjs_value_from_g_argument (JSContext  *context,
                                   GITypeInfo *type_info,
                                   GArgument  *arg);
 JSBool gjs_g_argument_release    (JSContext  *context,
+                                  jsval       value,
                                   GITransfer  transfer,
                                   GITypeInfo *type_info,
                                   GArgument  *arg);
 JSBool gjs_g_argument_release_in_arg (JSContext  *context,
+                                      jsval       value,
                                       GITransfer  transfer,
                                       GITypeInfo *type_info,
                                       GArgument  *arg);
@@ -72,11 +75,13 @@ JSBool _gjs_flags_value_is_valid (JSContext   *context,
                                   GType        gtype,
                                   guint        value);
 
-
-JSBool gjs_array_to_strv (JSContext   *context,
-                          jsval        array_value,
-                          unsigned int length,
-                          void       **arr_p);
+JSBool gjs_array_to_array (JSContext    *context,
+                           jsval         array_value,
+                           unsigned int  length,
+                           GITypeTag     param_type_tag,
+                           GITypeInfo   *param_info,
+                           gboolean      zero_terminated,
+                           void        **arguments);
 
 G_END_DECLS
 

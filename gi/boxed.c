@@ -808,6 +808,7 @@ boxed_set_field_from_value(JSContext   *context,
 
     if (!gjs_value_to_g_argument(context, value,
                                  type_info,
+                                 g_type_info_get_tag (type_info),
                                  g_base_info_get_name ((GIBaseInfo *)field_info),
                                  GJS_ARGUMENT_FIELD,
                                  GI_TRANSFER_NOTHING,
@@ -827,7 +828,7 @@ boxed_set_field_from_value(JSContext   *context,
 
 out:
     if (need_release)
-        gjs_g_argument_release (context, GI_TRANSFER_NOTHING,
+        gjs_g_argument_release (context, value, GI_TRANSFER_NOTHING,
                                 type_info,
                                 &arg);
 
