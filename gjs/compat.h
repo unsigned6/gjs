@@ -35,6 +35,18 @@ G_BEGIN_DECLS
 
 #endif
 
+/* See https://bugzilla.gnome.org/show_bug.cgi?id=622896 */
+#ifndef HAVE_JS_ADDVALUEROOT
+#define JS_AddValueRoot JS_AddRoot
+#define JS_AddObjectRoot JS_AddRoot
+#define JS_AddStringRoot JS_AddRoot
+#define JS_AddGCThingRoot JS_AddRoot
+#define JS_RemoveValueRoot JS_RemoveRoot
+#define JS_RemoveObjectRoot JS_RemoveRoot
+#define JS_RemoveStringRoot JS_RemoveRoot
+#define JS_RemoveGCThingRoot JS_RemoveRoot
+#endif
+
 G_END_DECLS
 
 #endif  /* __GJS_MEM_H__ */

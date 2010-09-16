@@ -233,7 +233,7 @@ gjstest_test_func_gjs_jsapi_util_error_throw(void)
 
     /* keep this around before we clear it */
     previous = exc;
-    JS_AddRoot(context, &previous);
+    JS_AddValueRoot(context, &previous);
 
     JS_ClearPendingException(context);
 
@@ -253,7 +253,7 @@ gjstest_test_func_gjs_jsapi_util_error_throw(void)
     g_assert(exc != JSVAL_VOID);
     g_assert(exc == previous);
 
-    JS_RemoveRoot(context, &previous);
+    JS_RemoveValueRoot(context, &previous);
 
     _gjs_unit_test_fixture_finish(&fixture);
 }
