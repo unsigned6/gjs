@@ -1412,7 +1412,7 @@ gjs_js_dbus_watch_name(JSContext  *context,
 static JSBool
 unique_name_getter(JSContext  *context,
                    JSObject   *obj,
-                   jsval       id,
+                   jsid        id,
                    jsval      *value_p)
 {
     const char *name;
@@ -1422,7 +1422,8 @@ unique_name_getter(JSContext  *context,
     if (!get_bus_type_from_object(context, obj, &bus_type))
         return JS_FALSE;
 
-    name = gjs_string_get_ascii(id);
+    if (!gjs_get_string_id(context, id, &name))
+        return JS_FALSE;
 
     gjs_debug_jsprop(GJS_DEBUG_DBUS, "Get prop '%s' on dbus object", name);
 
@@ -1522,7 +1523,7 @@ gjs_js_dbus_start_service(JSContext  *context,
 static JSBool
 gjs_js_dbus_get_machine_id(JSContext *context,
                            JSObject  *obj,
-                           jsval      key,
+                           jsid       key,
                            jsval     *value)
 {
     char *machine_id;
