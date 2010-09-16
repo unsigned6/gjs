@@ -758,7 +758,7 @@ log_and_maybe_keep_exception(JSContext  *context,
     if (message_p)
         *message_p = NULL;
 
-    JS_AddRoot(context, &exc);
+    JS_AddValueRoot(context, &exc);
     if (!JS_GetPendingException(context, &exc))
         goto out;
 
@@ -799,7 +799,7 @@ log_and_maybe_keep_exception(JSContext  *context,
     retval = JS_TRUE;
 
  out:
-    JS_RemoveRoot(context, &exc);
+    JS_RemoveValueRoot(context, &exc);
 
     JS_EndRequest(context);
 
