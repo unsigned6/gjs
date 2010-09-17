@@ -45,6 +45,7 @@
 #include <string.h>
 #include <jsdbgapi.h>
 #include "context.h"
+#include "compat.h"
 
 static const char*
 jsvalue_to_string(JSContext* cx, jsval val, gboolean* is_string)

@@ -29,6 +29,7 @@
 #include <util/misc.h>
 
 #include "jsapi-util.h"
+#include "compat.h"
 #include "jsapi-private.h"
 
 #include <string.h>
