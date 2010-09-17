@@ -52,7 +52,7 @@ gjs_js_one_value_from_dbus(JSContext       *context,
             DBusMessageIter struct_iter;
             int index;
 
-            obj = JS_NewArrayObject(context, 0, JSVAL_NULL);
+            obj = JS_NewArrayObject(context, 0, NULL);
             if (obj == NULL)
                 return JS_FALSE;
 
@@ -172,7 +172,7 @@ gjs_js_one_value_from_dbus(JSContext       *context,
                 DBusMessageIter array_iter;
                 int index;
 
-                obj = JS_NewArrayObject(context, 0, JSVAL_NULL);
+                obj = JS_NewArrayObject(context, 0, NULL);
                 if (obj == NULL)
                     return JS_FALSE;
 
