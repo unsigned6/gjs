@@ -66,6 +66,41 @@ gjs_runtime_set_data(JSRuntime      *runtime,
     g_dataset_set_data_full(runtime, name, data, dnotify);
 }
 
+static JSClass global_class = {
+    "GjsGlobal", JSCLASS_GLOBAL_FLAGS,
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+/**
+ * gjs_init_context_standard:
+ * @context: a #JSContext
+ *
+ * This function creates a default global object for @context,
+ * and calls JS_InitStandardClasses using it.
+ *
+ * Returns: %TRUE on success, %FALSE otherwise
+ */
+gboolean
+gjs_init_context_standard (JSContext       *context)
+{
+    JSObject *global;
+#ifdef HAVE_JS_NEWGLOBALOBJECT
+    global = JS_NewGlobalObject(context, &global_class);
+    if (global == NULL)
+        return FALSE;
+#else
+    global = JS_NewObject(context, &global_class, NULL, NULL);
+    if (global == NULL)
+        return FALSE;
+    JS_SetGlobalObject(context, global);
+#endif
+    if (!JS_InitStandardClasses(context, global))
+        return FALSE;
+    return TRUE;
+}
+
 /* Historical note:  There is no separate load context anymore. */
 JSContext*
 gjs_runtime_get_load_context(JSContext *context)
