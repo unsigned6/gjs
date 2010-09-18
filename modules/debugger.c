@@ -48,15 +48,18 @@ gjs_debugger_debug_error_hook(JSContext     *context,
                               void          *user_data)
 {
     const char *filename = NULL;
-    static gboolean running = FALSE;
+    static gboolean recursion_guard = FALSE;
     guint line = 0, pos = 0, flags = 0, errnum = 0;
     jsval retval = JSVAL_NULL, exc;
     GClosure *closure = (GClosure*)user_data;
+    jsval argv[7];
+    JSString *str;
+    int i;
 
-    if (running)
+    if (recursion_guard)
         return JS_FALSE;
 
-    running = TRUE;
+    recursion_guard = TRUE;
     if (report) {
         filename = report->filename;
         line = report->lineno;
@@ -71,12 +74,36 @@ gjs_debugger_debug_error_hook(JSContext     *context,
         exc = JSVAL_NULL;
     }
 
-    if (!gjs_closure_invoke_simple(context, closure, &retval, "ssiiiiv",
-                                   message, filename, line, pos,
-                                   flags, errnum, exc))
-        return JS_FALSE;
+    str = JS_NewStringCopyZ(context, message);
+    if (!str)
+        goto out;
+    argv[0] = STRING_TO_JSVAL(str);
+    str = JS_NewStringCopyZ(context, filename);
+    if (!str)
+        goto out;
+    argv[1] = STRING_TO_JSVAL(str);
+    if (!JS_NewNumberValue(context, line, &argv[2]))
+        goto out;
+    if (!JS_NewNumberValue(context, pos, &argv[3]))
+        goto out;
+    if (!JS_NewNumberValue(context, flags, &argv[4]))
+        goto out;
+    if (!JS_NewNumberValue(context, errnum, &argv[5]))
+        goto out;
+    argv[6] = exc;
 
-    running = FALSE;
+    for (i = 0; i < 7; i++)
+        JS_AddValueRoot(context, &argv[i]);
+    JS_AddValueRoot(context, &retval);
+
+    gjs_closure_invoke(closure, 7, argv, &retval);
+
+ out:
+    for (i = 0; i < 7; i++)
+        JS_RemoveValueRoot(context, &argv[i]);
+    JS_RemoveValueRoot(context, &retval);
+
+    recursion_guard = FALSE;
     return JS_TRUE;
 }
 
