@@ -345,9 +345,6 @@ gjs_context_dispose(GObject *object)
     }
 
     if (js_context->global != NULL) {
-        JS_BeginRequest(js_context->context);
-        JS_RemoveObjectRoot(js_context->context, &js_context->global);
-        JS_EndRequest(js_context->context);
         js_context->global = NULL;
     }
 
