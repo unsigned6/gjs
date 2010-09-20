@@ -75,6 +75,12 @@ gjs_debugger_debug_error_hook(JSContext     *context,
         exc = JSVAL_NULL;
     }
 
+    for (i = 0; i < 7; i++) {
+        argv[i] = JSVAL_NULL;
+        JS_AddValueRoot(context, &argv[i]);
+    }
+    JS_AddValueRoot(context, &retval);
+
     str = JS_NewStringCopyZ(context, message);
     if (!str)
         goto out;
@@ -92,10 +98,6 @@ gjs_debugger_debug_error_hook(JSContext     *context,
     if (!JS_NewNumberValue(context, errnum, &argv[5]))
         goto out;
     argv[6] = exc;
-
-    for (i = 0; i < 7; i++)
-        JS_AddValueRoot(context, &argv[i]);
-    JS_AddValueRoot(context, &retval);
 
     gjs_closure_invoke(closure, 7, argv, &retval);
 
