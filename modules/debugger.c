@@ -28,6 +28,7 @@
 
 #include <glib.h>
 #include <gjs/gjs.h>
+#include <gjs/compat.h>
 #include <gi/closure.h>
 
 #include "debugger.h"
