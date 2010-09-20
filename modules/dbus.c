@@ -1700,11 +1700,16 @@ define_bus_proto(JSContext *context,
                            1, GJS_MODULE_PROP_FLAGS))
         goto out;
 
-    /* Add the bus proto object inside the passed in module object */
+    /* Add the bus proto object inside the passed in module object.
+     * Note we explicitly set the flags, rather than using the
+     * standard GJS_MODULE_PROP_FLAGS.  The latter includes
+     * JSPROP_READONLY, which doesn't work since dbus.js adds
+     * attributes to this property.
+     */
     if (!JS_DefineProperty(context, module_obj,
                            "_busProto", OBJECT_TO_JSVAL(bus_proto_obj),
                            NULL, NULL,
-                           GJS_MODULE_PROP_FLAGS))
+                           JSPROP_PERMANENT | JSPROP_ENUMERATE))
         goto out;
 
     *bus_proto_obj_out = bus_proto_obj;
