@@ -28,6 +28,8 @@
 
 G_BEGIN_DECLS
 
+#include "config.h"
+
 #if !GLIB_CHECK_VERSION(2, 18, 0)
 
 #define g_set_error_literal(error, domain, code, message) g_set_error(error, domain, code, "%s", message)
