@@ -1780,6 +1780,12 @@ gjs_js_define_dbus_stuff(JSContext      *context,
                          JSObject       *module_obj)
 {
     JSObject *bus_proto_obj;
+    jsval bus_proto_val;
+    JSBool retval = JS_FALSE;
+
+    bus_proto_val = JSVAL_NULL;
+    JS_AddValueRoot(context, &bus_proto_val);
+
     /* Note that we don't actually connect to dbus in here, since the
      * JS program may not even be using it.
      */
@@ -1788,53 +1794,59 @@ gjs_js_define_dbus_stuff(JSContext      *context,
                            "signatureLength",
                            gjs_js_dbus_signature_length,
                            1, GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     if (!JS_DefineProperty(context, module_obj,
                            "BUS_SESSION",
                            INT_TO_JSVAL(DBUS_BUS_SESSION),
                            NULL, NULL,
                            GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     if (!JS_DefineProperty(context, module_obj,
                            "BUS_SYSTEM",
                            INT_TO_JSVAL(DBUS_BUS_SYSTEM),
                            NULL, NULL,
                            GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     if (!JS_DefineProperty(context, module_obj,
                            "BUS_STARTER",
                            INT_TO_JSVAL(DBUS_BUS_STARTER),
                            NULL, NULL,
                            GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     if (!JS_DefineProperty(context, module_obj,
                            "localMachineID",
                            JSVAL_VOID,
                            gjs_js_dbus_get_machine_id, NULL,
                            GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     if (!JS_DefineFunction(context, module_obj,
                            "getCurrentMessageContext",
                            gjs_js_dbus_get_current_message_context,
                            0, GJS_MODULE_PROP_FLAGS))
-        return JS_FALSE;
+        goto out;
 
     /* Define both the session and system objects */
     if (!define_bus_proto(context, module_obj, &bus_proto_obj))
-        return JS_FALSE;
+        goto out;
+
+    bus_proto_val = OBJECT_TO_JSVAL(bus_proto_obj);
 
     if (!define_bus_object(context, module_obj, bus_proto_obj, DBUS_BUS_SESSION))
-        return JS_FALSE;
+        goto out;
 
     if (!define_bus_object(context, module_obj, bus_proto_obj, DBUS_BUS_SYSTEM))
-        return JS_FALSE;
+        goto out;
 
-    return JS_TRUE;
+    retval = JS_TRUE;
+ out:
+    JS_RemoveValueRoot(context, &bus_proto_val);
+
+    return retval;
 }
 
 GJS_REGISTER_NATIVE_MODULE("dbusNative", gjs_js_define_dbus_stuff)
