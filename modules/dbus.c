@@ -1738,9 +1738,15 @@ define_bus_object(JSContext  *context,
     bus_val = JSVAL_VOID;
     JS_AddValueRoot(context, &bus_val);
 
-    bus_obj = JS_ConstructObject(context, NULL, proto_obj, NULL);
+    bus_obj = JS_ConstructObject(context, NULL, NULL, NULL);
     if (bus_obj == NULL)
         goto out;
+    /* Separate SetPrototype call since mixing custom prototype with
+     * Object class in ConstructObject seems to fail in 1.9.3.
+     * Really, we should actually be using a custom class for internal
+     * objects like this.
+     */
+    JS_SetPrototype(context, bus_obj, proto_obj);
 
     bus_val = OBJECT_TO_JSVAL(bus_obj);
 
