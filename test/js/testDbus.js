@@ -206,10 +206,11 @@ Real.prototype = {
 };
 
 DBus.conformExport(Real.prototype, realIface);
-DBus.session.exportObject('/com/litl/Real', new Real());
-DBus.session.acquire_name('com.litl.Real', DBus.SINGLE_INSTANCE,
-                          function(name){log("Acquired name " + name);},
-                          function(name){log("Lost name  " + name);});
+var exportedReal = new Real();
+DBus.session.exportObject('/com/litl/Real', exportedReal);
+var exportedNameId = DBus.session.acquire_name('com.litl.Real', DBus.SINGLE_INSTANCE,
+					       function(name){log("Acquired name " + name);},
+					       function(name){log("Lost name  " + name);});
 
 function testFrobateStuff() {
     let theResult, theExcp;
@@ -995,4 +996,9 @@ function testIntrospectReal() {
     assertEquals(0, xml.interface[2].signal.length());
 }
 
-gjstestRun();
+let rv = gjstestRun();
+
+DBus.session.unexportObject(exportedReal);
+DBus.session.release_name_by_id(exportedNameId);
+
+rv;
