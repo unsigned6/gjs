@@ -1,6 +1,7 @@
 /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 /*
  * Copyright (c) 2009  litl, LLC
+ * Copyright (c) 2010  Red Hat, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -59,6 +60,8 @@ G_BEGIN_DECLS
 #define JSID_VOID JSVAL_VOID
 #define JSID_IS_VOID(id) (id == JSVAL_VOID)
 
+#else
+#define HAVE_JS_ENUMERATE_INIT_ALL
 #endif
 
 G_END_DECLS
