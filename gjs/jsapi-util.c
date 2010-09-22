@@ -961,30 +961,38 @@ gjs_move_exception(JSContext      *src_context,
                    JSContext      *dest_context)
 {
     JSBool success;
+    jsval exc;
 
     JS_BeginRequest(src_context);
+
+    if (!JS_GetPendingException(src_context, &exc)) {
+        JS_EndRequest(src_context);
+        return JS_FALSE;
+    }
+    if (src_context == dest_context) {
+        JS_EndRequest(src_context);
+        return JS_TRUE;
+    }
+
+    JS_AddValueRoot(src_context, &exc);
+
+    JS_ClearPendingException(src_context);
+
     JS_BeginRequest(dest_context);
 
     /* NOTE: src and dest could be the same. */
-    jsval exc;
-    if (JS_GetPendingException(src_context, &exc)) {
-        if (src_context != dest_context) {
-            /* try to add the current stack of dest_context to the
-             * stack trace of exc */
-            try_to_chain_stack_trace(src_context, dest_context, exc);
-            /* move the exception to dest_context */
-            JS_SetPendingException(dest_context, exc);
-            JS_ClearPendingException(src_context);
-        }
-        success = JS_TRUE;
-    } else {
-        success = JS_FALSE;
-    }
+    /* try to add the current stack of dest_context to the
+     * stack trace of exc */
+    try_to_chain_stack_trace(src_context, dest_context, exc);
+    /* move the exception to dest_context */
+    JS_SetPendingException(dest_context, exc);
+
+    JS_RemoveValueRoot(src_context, &exc);
 
     JS_EndRequest(dest_context);
     JS_EndRequest(src_context);
 
-    return success;
+    return JS_TRUE;
 }
 
 JSBool
@@ -999,16 +1007,15 @@ gjs_call_function_value(JSContext      *context,
     JSContext *call_context;
 
     JS_BeginRequest(context);
-
     call_context = gjs_runtime_get_call_context(JS_GetRuntime(context));
-    JS_BeginRequest(call_context);
+    JS_EndRequest(context);
 
+    JS_BeginRequest(call_context);
     result = JS_CallFunctionValue(call_context, obj, fval,
                                   argc, argv, rval);
     gjs_move_exception(call_context, context);
 
     JS_EndRequest(call_context);
-    JS_EndRequest(context);
     return result;
 }
 
