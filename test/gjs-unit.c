@@ -175,7 +175,6 @@ main(int argc, char **argv)
     g_setenv("XDG_DATA_HOME", data_home, FALSE);
     g_setenv("GJS_PATH", path->str, FALSE);
 
-    gjs_crash_after_timeout(60*7); /* give the unit tests 7 minutes to complete */
     gjs_init_sleep_on_crash();
 
     setlocale(LC_ALL, "");
