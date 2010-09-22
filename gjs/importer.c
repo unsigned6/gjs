@@ -935,7 +935,7 @@ importer_new_resolve(JSContext *context,
         return JS_TRUE; /* we are the prototype, or have the wrong class */
 
     /* We always import in the special load context. */
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
     if (do_import(load_context, obj, priv, name)) {
         *objp = obj;
@@ -1188,13 +1188,13 @@ gjs_define_importer(JSContext    *context,
  * we just ignore all calls after the first and hope the args are the same.
  */
 JSBool
-gjs_create_root_importer(JSRuntime   *runtime,
+gjs_create_root_importer(GjsContext  *gjs_context,
                          const char **initial_search_path,
                          gboolean     add_standard_search_path)
 {
     JSContext *context;
 
-    context = gjs_runtime_get_load_context(runtime);
+    context = gjs_context_get_native_context(gjs_context);
 
     JS_BeginRequest(context);
 
@@ -1219,16 +1219,18 @@ gjs_create_root_importer(JSRuntime   *runtime,
 }
 
 JSBool
-gjs_define_root_importer(JSContext   *context,
+gjs_define_root_importer(GjsContext  *gjs_context,
                          JSObject    *in_object,
                          const char  *importer_name)
 {
     JSContext *load_context;
+    JSContext *context;
     jsval value;
     JSBool success;
 
     success = JS_FALSE;
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_context_get_native_context(gjs_context);
+    context = load_context;
     JS_BeginRequest(load_context);
 
     if (!gjs_object_require_property(load_context,

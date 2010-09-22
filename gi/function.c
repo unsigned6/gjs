@@ -1038,7 +1038,7 @@ gjs_define_function(JSContext      *context,
     JSObject *function;
     JSContext *load_context;
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     function = function_new(load_context, info);

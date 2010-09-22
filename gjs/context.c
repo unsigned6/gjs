@@ -372,9 +372,6 @@ gjs_context_dispose(GObject *object)
             /* Avoid keeping JSContext with a dangling pointer to the
              * runtime.
              */
-            gjs_runtime_clear_call_context(js_context->runtime);
-            gjs_runtime_clear_load_context(js_context->runtime);
-
             gjs_debug(GJS_DEBUG_CONTEXT,
                       "Destroying JS runtime");
 
@@ -657,7 +654,7 @@ gjs_context_constructor (GType                  type,
          * passed-in search path. If someone else already created
          * the root importer, this is a no-op.
          */
-        if (!gjs_create_root_importer(js_context->runtime,
+        if (!gjs_create_root_importer(js_context,
                                       js_context->search_path ?
                                       (const char**) js_context->search_path :
                                       NULL,
@@ -667,7 +664,7 @@ gjs_context_constructor (GType                  type,
         /* Now copy the global root importer (which we just created,
          * if it didn't exist) to our global object
          */
-        if (!gjs_define_root_importer(js_context->context,
+        if (!gjs_define_root_importer(js_context,
                                       js_context->global,
                                       "imports"))
             gjs_fatal("Failed to point 'imports' property at root importer");

@@ -88,7 +88,7 @@ ns_new_resolve(JSContext *context,
     if (priv == NULL)
         return JS_TRUE; /* we are the prototype, or have the wrong class */
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     repo = g_irepository_get_default();

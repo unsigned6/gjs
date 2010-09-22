@@ -446,12 +446,9 @@ gjs_keep_alive_remove_global_child(JSContext         *context,
 }
 
 JSObject*
-gjs_keep_alive_get_for_load_context(JSRuntime *runtime)
+gjs_keep_alive_get_for_load_context(JSContext *context)
 {
-    JSContext *context;
     JSObject *keep_alive;
-
-    context = gjs_runtime_get_load_context(runtime);
 
     g_assert(context != NULL);
 

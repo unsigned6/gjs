@@ -843,7 +843,7 @@ JSBool
 gjs_define_byte_array_stuff(JSContext      *context,
                             JSObject       *in_object)
 {
-    JSContext *load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    JSContext *load_context = gjs_runtime_get_load_context(context);
     JSObject *global = JS_GetGlobalObject(context);
     gjs_byte_array_prototype = JS_InitClass(load_context, global,
                              NULL,

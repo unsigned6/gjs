@@ -65,110 +65,18 @@ gjs_runtime_set_data(JSRuntime      *runtime,
     g_dataset_set_data_full(runtime, name, data, dnotify);
 }
 
-/* The "load context" is the one we use for loading
- * modules and initializing classes.
- */
+/* Historical note:  There is no separate load context anymore. */
 JSContext*
-gjs_runtime_get_load_context(JSRuntime *runtime)
+gjs_runtime_get_load_context(JSContext *context)
 {
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-load-context");
-    if (context == NULL) {
-        gjs_debug(GJS_DEBUG_CONTEXT,
-                  "Creating load context for runtime %p",
-                  runtime);
-        context = g_object_new(GJS_TYPE_CONTEXT,
-                               "runtime", runtime,
-                               "is-load-context", TRUE,
-                               NULL);
-        gjs_runtime_set_data(runtime,
-                             "gjs-load-context",
-                             context,
-                             g_object_unref);
-    }
-
-    return (JSContext*)gjs_context_get_native_context(context);
+    return context;
 }
 
+/* Historical note: There is no separate call context anymore. */
 JSContext*
-gjs_runtime_peek_load_context(JSRuntime *runtime)
+gjs_runtime_get_call_context(JSContext *context)
 {
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-load-context");
-    if (context == NULL) {
-        return NULL;
-    } else {
-        return (JSContext*)gjs_context_get_native_context(context);
-    }
-}
-
-void
-gjs_runtime_clear_load_context(JSRuntime *runtime)
-{
-    gjs_debug(GJS_DEBUG_CONTEXT, "Clearing load context");
-    gjs_runtime_set_data(runtime,
-                         "gjs-load-context",
-                         NULL,
-                         NULL);
-    gjs_debug(GJS_DEBUG_CONTEXT, "Load context cleared");
-}
-
-/* The call context exists because when we call a closure, the scope
- * chain on the context is set to the original scope chain of the
- * closure. We want to avoid using any existing context (especially
- * the load context) because the closure "messes up" the scope chain
- * on the context.
- *
- * Unlike the load context, which is expected to be an eternal
- * singleton, we only cache the call context for efficiency. It would
- * be just as workable to recreate it for each call.
- */
-JSContext*
-gjs_runtime_get_call_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-call-context");
-    if (context == NULL) {
-        gjs_debug(GJS_DEBUG_CONTEXT,
-                  "Creating call context for runtime %p",
-                  runtime);
-        context = g_object_new(GJS_TYPE_CONTEXT,
-                               "runtime", runtime,
-                               NULL);
-        gjs_runtime_set_data(runtime,
-                             "gjs-call-context",
-                             context,
-                             g_object_unref);
-    }
-
-    return (JSContext*)gjs_context_get_native_context(context);
-}
-
-static JSContext*
-gjs_runtime_peek_call_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-call-context");
-    if (context == NULL) {
-        return NULL;
-    } else {
-        return (JSContext*)gjs_context_get_native_context(context);
-    }
-}
-
-void
-gjs_runtime_clear_call_context(JSRuntime *runtime)
-{
-    gjs_debug(GJS_DEBUG_CONTEXT, "Clearing call context");
-    gjs_runtime_set_data(runtime,
-                         "gjs-call-context",
-                         NULL,
-                         NULL);
-    gjs_debug(GJS_DEBUG_CONTEXT, "Call context cleared");
+    return context;
 }
 
 static void
@@ -335,7 +243,7 @@ gjs_init_class_dynamic(JSContext      *context,
      * the class in whatever global object initialized the
      * class first, which is not desirable.
      */
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     /* JS_InitClass() wants to define the constructor in the global object, so
@@ -542,7 +450,7 @@ gjs_construct_object_dynamic(JSContext      *context,
      * can't find the constructor in whatever random global object is set
      * on the passed-in context.
      */
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     proto_class = JS_GET_CLASS(load_context, proto);
@@ -743,8 +651,8 @@ gjs_explain_scope(JSContext  *context,
               "=== %s ===",
               title);
 
-    load_context = gjs_runtime_peek_load_context(JS_GetRuntime(context));
-    call_context = gjs_runtime_peek_call_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
+    call_context = gjs_runtime_get_call_context(context);
 
     JS_BeginRequest(context);
     JS_BeginRequest(load_context);
@@ -960,7 +868,6 @@ JSBool
 gjs_move_exception(JSContext      *src_context,
                    JSContext      *dest_context)
 {
-    JSBool success;
     jsval exc;
 
     JS_BeginRequest(src_context);
@@ -1007,7 +914,7 @@ gjs_call_function_value(JSContext      *context,
     JSContext *call_context;
 
     JS_BeginRequest(context);
-    call_context = gjs_runtime_get_call_context(JS_GetRuntime(context));
+    call_context = gjs_runtime_get_call_context(context);
     JS_EndRequest(context);
 
     JS_BeginRequest(call_context);

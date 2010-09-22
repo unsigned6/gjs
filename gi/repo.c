@@ -66,7 +66,7 @@ resolve_namespace_object(JSContext  *context,
     const char *version;
     JSObject *result;
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     if (!gjs_object_require_property(load_context, repo_obj, "GI repository object", "versions", &versions_val) ||
@@ -147,7 +147,7 @@ repo_new_resolve(JSContext *context,
     if (priv == NULL)
         return JS_TRUE; /* we are the prototype, or have the wrong class */
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
     resolve_namespace_object(load_context, obj, name);
     if (gjs_move_exception(load_context, context)) {
@@ -517,7 +517,7 @@ gjs_lookup_namespace_object_by_name(JSContext      *context,
      * in the load context.
      */
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
     global = JS_GetGlobalObject(load_context);
 

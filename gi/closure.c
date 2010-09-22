@@ -360,7 +360,7 @@ gjs_closure_new(JSContext  *context,
      * This ensures that the context is still alive when the closure
      * is invoked (as long as the runtime lives)
      */
-    c->context = gjs_runtime_get_load_context(c->runtime);
+    c->context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(c->context);
 
     c->obj = callable;

@@ -1864,7 +1864,7 @@ gjs_js_define_dbus_exports(JSContext      *context,
     JSBool success;
 
     success = JS_FALSE;
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
+    load_context = gjs_runtime_get_load_context(context);
     JS_BeginRequest(load_context);
 
     exports = exports_new(load_context, which_bus);
