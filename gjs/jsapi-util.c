@@ -29,7 +29,6 @@
 #include <util/misc.h>
 
 #include "jsapi-util.h"
-#include "context-jsapi.h"
 #include "jsapi-private.h"
 
 #include <string.h>
@@ -63,112 +62,6 @@ gjs_runtime_set_data(JSRuntime      *runtime,
                      GDestroyNotify  dnotify)
 {
     g_dataset_set_data_full(runtime, name, data, dnotify);
-}
-
-/* The "load context" is the one we use for loading
- * modules and initializing classes.
- */
-JSContext*
-gjs_runtime_get_load_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-load-context");
-    if (context == NULL) {
-        gjs_debug(GJS_DEBUG_CONTEXT,
-                  "Creating load context for runtime %p",
-                  runtime);
-        context = g_object_new(GJS_TYPE_CONTEXT,
-                               "runtime", runtime,
-                               "is-load-context", TRUE,
-                               NULL);
-        gjs_runtime_set_data(runtime,
-                             "gjs-load-context",
-                             context,
-                             g_object_unref);
-    }
-
-    return (JSContext*)gjs_context_get_native_context(context);
-}
-
-JSContext*
-gjs_runtime_peek_load_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-load-context");
-    if (context == NULL) {
-        return NULL;
-    } else {
-        return (JSContext*)gjs_context_get_native_context(context);
-    }
-}
-
-void
-gjs_runtime_clear_load_context(JSRuntime *runtime)
-{
-    gjs_debug(GJS_DEBUG_CONTEXT, "Clearing load context");
-    gjs_runtime_set_data(runtime,
-                         "gjs-load-context",
-                         NULL,
-                         NULL);
-    gjs_debug(GJS_DEBUG_CONTEXT, "Load context cleared");
-}
-
-/* The call context exists because when we call a closure, the scope
- * chain on the context is set to the original scope chain of the
- * closure. We want to avoid using any existing context (especially
- * the load context) because the closure "messes up" the scope chain
- * on the context.
- *
- * Unlike the load context, which is expected to be an eternal
- * singleton, we only cache the call context for efficiency. It would
- * be just as workable to recreate it for each call.
- */
-JSContext*
-gjs_runtime_get_call_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-call-context");
-    if (context == NULL) {
-        gjs_debug(GJS_DEBUG_CONTEXT,
-                  "Creating call context for runtime %p",
-                  runtime);
-        context = g_object_new(GJS_TYPE_CONTEXT,
-                               "runtime", runtime,
-                               NULL);
-        gjs_runtime_set_data(runtime,
-                             "gjs-call-context",
-                             context,
-                             g_object_unref);
-    }
-
-    return (JSContext*)gjs_context_get_native_context(context);
-}
-
-static JSContext*
-gjs_runtime_peek_call_context(JSRuntime *runtime)
-{
-    GjsContext *context;
-
-    context = gjs_runtime_get_data(runtime, "gjs-call-context");
-    if (context == NULL) {
-        return NULL;
-    } else {
-        return (JSContext*)gjs_context_get_native_context(context);
-    }
-}
-
-void
-gjs_runtime_clear_call_context(JSRuntime *runtime)
-{
-    gjs_debug(GJS_DEBUG_CONTEXT, "Clearing call context");
-    gjs_runtime_set_data(runtime,
-                         "gjs-call-context",
-                         NULL,
-                         NULL);
-    gjs_debug(GJS_DEBUG_CONTEXT, "Call context cleared");
 }
 
 static void
@@ -320,7 +213,6 @@ gjs_init_class_dynamic(JSContext      *context,
     jsval value;
     char *private_name;
     JSObject *prototype;
-    JSContext *load_context;
 
     if (clasp->name != NULL) {
         g_warning("Dynamic class should not have a name in the JSClass struct");
@@ -328,15 +220,6 @@ gjs_init_class_dynamic(JSContext      *context,
     }
 
     JS_BeginRequest(context);
-
-    /* We replace the passed-in context and global object with our
-     * runtime-global permanent load context. Otherwise, in a
-     * process with multiple contexts, we'd arbitrarily define
-     * the class in whatever global object initialized the
-     * class first, which is not desirable.
-     */
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
-    JS_BeginRequest(load_context);
 
     /* JS_InitClass() wants to define the constructor in the global object, so
      * we give it a private and namespaced name... passing in the namespace
@@ -347,17 +230,17 @@ gjs_init_class_dynamic(JSContext      *context,
     private_name = g_strdup_printf("_private_%s_%s", ns_name, class_name);
 
     prototype = NULL;
-    if (gjs_object_get_property(load_context, JS_GetGlobalObject(load_context),
+    if (gjs_object_get_property(context, JS_GetGlobalObject(context),
                                 private_name, &value) &&
         JSVAL_IS_OBJECT(value)) {
         jsval proto_val;
 
         g_free(private_name); /* don't need it anymore */
 
-        if (!gjs_object_require_property(load_context, JSVAL_TO_OBJECT(value), NULL,
+        if (!gjs_object_require_property(context, JSVAL_TO_OBJECT(value), NULL,
                                          "prototype", &proto_val) ||
             !JSVAL_IS_OBJECT(proto_val)) {
-            gjs_throw(load_context, "prototype was not defined or not an object?");
+            gjs_throw(context, "prototype was not defined or not an object?");
             goto error;
         }
         prototype = JSVAL_TO_OBJECT(proto_val);
@@ -365,7 +248,7 @@ gjs_init_class_dynamic(JSContext      *context,
         DynamicJSClass *class_copy;
         RuntimeData *rd;
 
-        rd = get_data_from_context(load_context);
+        rd = get_data_from_context(context);
 
         class_copy = g_slice_new0(DynamicJSClass);
         class_copy->base = *clasp;
@@ -383,7 +266,7 @@ gjs_init_class_dynamic(JSContext      *context,
                   "Initializing dynamic class %s %p",
                   class_name, class_copy);
 
-        prototype = JS_InitClass(load_context, JS_GetGlobalObject(load_context),
+        prototype = JS_InitClass(context, JS_GetGlobalObject(context),
                                  parent_proto, &class_copy->base,
                                  constructor, nargs,
                                  ps, fs,
@@ -392,7 +275,7 @@ gjs_init_class_dynamic(JSContext      *context,
         /* Retrieve the property again so we can define it in
          * in_object
          */
-        if (!gjs_object_require_property(load_context, JS_GetGlobalObject(load_context), NULL,
+        if (!gjs_object_require_property(context, JS_GetGlobalObject(context), NULL,
                                          class_copy->base.name, &value))
             goto error;
     }
@@ -402,26 +285,17 @@ gjs_init_class_dynamic(JSContext      *context,
     /* Now manually define our constructor with a sane name, in the
      * namespace object.
      */
-    if (!JS_DefineProperty(load_context, in_object,
+    if (!JS_DefineProperty(context, in_object,
                            class_name,
                            value,
                            NULL, NULL,
                            GJS_MODULE_PROP_FLAGS))
         goto error;
 
-    JS_EndRequest(load_context);
     JS_EndRequest(context);
     return prototype;
 
  error:
-    /* Move the exception to the calling context from load context.
-     */
-    if (!gjs_move_exception(load_context, context)) {
-        /* set an exception since none was set */
-        gjs_throw(context, "No exception was set, but class initialize failed somehow");
-    }
-
-    JS_EndRequest(load_context);
     JS_EndRequest(context);
     return NULL;
 }
@@ -532,26 +406,17 @@ gjs_construct_object_dynamic(JSContext      *context,
 {
     RuntimeData *rd;
     JSClass *proto_class;
-    JSContext *load_context;
     JSObject *result;
 
     JS_BeginRequest(context);
 
-    /* We replace the passed-in context and global object with our
-     * runtime-global permanent load context. Otherwise, JS_ConstructObject
-     * can't find the constructor in whatever random global object is set
-     * on the passed-in context.
-     */
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
-    JS_BeginRequest(load_context);
+    proto_class = JS_GET_CLASS(context, proto);
 
-    proto_class = JS_GET_CLASS(load_context, proto);
-
-    rd = get_data_from_context(load_context);
+    rd = get_data_from_context(context);
 
     /* Check that it's safe to cast to DynamicJSClass */
     if (g_hash_table_lookup(rd->dynamic_classes, proto_class) == NULL) {
-        gjs_throw(load_context, "Prototype is not for a dynamically-registered class");
+        gjs_throw(context, "Prototype is not for a dynamically-registered class");
         goto error;
     }
 
@@ -560,26 +425,18 @@ gjs_construct_object_dynamic(JSContext      *context,
                         proto_class->name, proto_class, proto);
 
     if (argc > 0)
-        result = JS_ConstructObjectWithArguments(load_context, proto_class, proto, NULL, argc, argv);
+        result = JS_ConstructObjectWithArguments(context, proto_class, proto, NULL, argc, argv);
     else
-        result = JS_ConstructObject(load_context, proto_class, proto, NULL);
+        result = JS_ConstructObject(context, proto_class, proto, NULL);
 
     if (!result)
         goto error;
 
-    JS_EndRequest(load_context);
     JS_EndRequest(context);
     return result;
 
  error:
-    /* Move the exception to the calling context from load context.
-     */
-    if (!gjs_move_exception(load_context, context)) {
-        /* set an exception since none was set */
-        gjs_throw(context, "No exception was set, but object construction failed somehow");
-    }
 
-    JS_EndRequest(load_context);
     JS_EndRequest(context);
     return NULL;
 }
@@ -733,8 +590,6 @@ void
 gjs_explain_scope(JSContext  *context,
                   const char *title)
 {
-    JSContext *load_context;
-    JSContext *call_context;
     JSObject *global;
     JSObject *parent;
     GString *chain;
@@ -743,21 +598,11 @@ gjs_explain_scope(JSContext  *context,
               "=== %s ===",
               title);
 
-    load_context = gjs_runtime_peek_load_context(JS_GetRuntime(context));
-    call_context = gjs_runtime_peek_call_context(JS_GetRuntime(context));
-
     JS_BeginRequest(context);
-    JS_BeginRequest(load_context);
-    JS_BeginRequest(call_context);
 
     JS_EnterLocalRootScope(context);
 
-    gjs_debug(GJS_DEBUG_SCOPE,
-              "  Context: %p %s",
-              context,
-              context == load_context ? "(LOAD CONTEXT)" :
-              context == call_context ? "(CALL CONTEXT)" :
-              "");
+    gjs_debug(GJS_DEBUG_SCOPE, "  Context: %p", context);
 
     global = JS_GetGlobalObject(context);
     gjs_debug(GJS_DEBUG_SCOPE,
@@ -784,8 +629,6 @@ gjs_explain_scope(JSContext  *context,
 
     JS_LeaveLocalRootScope(context);
 
-    JS_EndRequest(call_context);
-    JS_EndRequest(load_context);
     JS_EndRequest(context);
 }
 
@@ -911,82 +754,6 @@ gjs_log_and_keep_exception(JSContext *context,
     return log_and_maybe_keep_exception(context, message_p, TRUE);
 }
 
-static void
-try_to_chain_stack_trace(JSContext *src_context, JSContext *dst_context,
-                         jsval src_exc) {
-    /* append current stack of dst_context to stack trace for src_exc.
-     * we bail if anything goes wrong, just using the src_exc unmodified
-     * in that case. */
-    jsval chained, src_stack, dst_stack, new_stack;
-    JSString *new_stack_str;
-
-    JS_BeginRequest(src_context);
-    JS_BeginRequest(dst_context);
-
-    if (!JSVAL_IS_OBJECT(src_exc))
-        goto out; // src_exc doesn't have a stack trace
-
-    /* create a new exception in dst_context to get a stack trace */
-    gjs_throw_literal(dst_context, "Chained exception");
-    if (!(JS_GetPendingException(dst_context, &chained) &&
-          JSVAL_IS_OBJECT(chained)))
-        goto out; // gjs_throw_literal didn't work?!
-    JS_ClearPendingException(dst_context);
-
-    /* get stack trace for src_exc and chained */
-    if (!(gjs_object_get_property(dst_context, JSVAL_TO_OBJECT(chained),
-                                  "stack", &dst_stack) &&
-          JSVAL_IS_STRING(dst_stack)))
-        goto out; // couldn't get chained stack
-    if (!(gjs_object_get_property(src_context, JSVAL_TO_OBJECT(src_exc),
-                                  "stack", &src_stack) &&
-          JSVAL_IS_STRING(src_stack)))
-        goto out; // couldn't get source stack
-
-    /* add chained exception's stack trace to src_exc */
-    new_stack_str = JS_ConcatStrings
-        (dst_context, JSVAL_TO_STRING(src_stack), JSVAL_TO_STRING(dst_stack));
-    if (new_stack_str==NULL)
-        goto out; // couldn't concatenate src and dst stacks?!
-    new_stack = STRING_TO_JSVAL(new_stack_str);
-    JS_SetProperty(dst_context, JSVAL_TO_OBJECT(src_exc), "stack", &new_stack);
-
- out:
-    JS_EndRequest(dst_context);
-    JS_EndRequest(src_context);
-}
-
-JSBool
-gjs_move_exception(JSContext      *src_context,
-                   JSContext      *dest_context)
-{
-    JSBool success;
-
-    JS_BeginRequest(src_context);
-    JS_BeginRequest(dest_context);
-
-    /* NOTE: src and dest could be the same. */
-    jsval exc;
-    if (JS_GetPendingException(src_context, &exc)) {
-        if (src_context != dest_context) {
-            /* try to add the current stack of dest_context to the
-             * stack trace of exc */
-            try_to_chain_stack_trace(src_context, dest_context, exc);
-            /* move the exception to dest_context */
-            JS_SetPendingException(dest_context, exc);
-            JS_ClearPendingException(src_context);
-        }
-        success = JS_TRUE;
-    } else {
-        success = JS_FALSE;
-    }
-
-    JS_EndRequest(dest_context);
-    JS_EndRequest(src_context);
-
-    return success;
-}
-
 JSBool
 gjs_call_function_value(JSContext      *context,
                         JSObject       *obj,
@@ -996,18 +763,11 @@ gjs_call_function_value(JSContext      *context,
                         jsval          *rval)
 {
     JSBool result;
-    JSContext *call_context;
 
     JS_BeginRequest(context);
-
-    call_context = gjs_runtime_get_call_context(JS_GetRuntime(context));
-    JS_BeginRequest(call_context);
-
-    result = JS_CallFunctionValue(call_context, obj, fval,
+    result = JS_CallFunctionValue(context, obj, fval,
                                   argc, argv, rval);
-    gjs_move_exception(call_context, context);
 
-    JS_EndRequest(call_context);
     JS_EndRequest(context);
     return result;
 }

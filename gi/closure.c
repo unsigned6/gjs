@@ -40,30 +40,7 @@ typedef struct {
 } Closure;
 
 /*
- * Memory management of closures is "interesting" because we're keeping around
- * a JSContext* and then trying to use it spontaneously from the main loop.
- * I don't think that's really quite kosher, and perhaps the problem is that
- * (in xulrunner) we just need to save a different context.
- *
- * Or maybe the right fix is to create our own context just for this?
- *
- * But for the moment, we save the context that was used to create the closure.
- *
- * Here's the problem: this context can be destroyed. AFTER the
- * context is destroyed, or at least potentially after, the objects in
- * the context's global object may be garbage collected. Remember that
- * JSObject* belong to a runtime, not a context.
- *
- * There is apparently no robust way to track context destruction in
- * SpiderMonkey, because the context can be destroyed without running
- * the garbage collector, and xulrunner takes over the JS_SetContextCallback()
- * callback. So there's no callback for us.
- *
- * So, when we go to use our context, we iterate the contexts in the runtime
- * and see if ours is still in the valid list, and decide to invalidate
- * the closure if it isn't.
- *
- * The closure can thus be destroyed in several cases:
+ * The closure can be destroyed in several cases:
  * - invalidation by unref, e.g. when a signal is disconnected, closure is unref'd
  * - invalidation because we were invoked while the context was dead
  * - invalidation through finalization (we were garbage collected)
@@ -356,11 +333,7 @@ gjs_closure_new(JSContext  *context,
 
     c = (Closure*) g_closure_new_simple(sizeof(Closure), NULL);
     c->runtime = JS_GetRuntime(context);
-    /* Closure are executed in our special "load-context" (one per runtime).
-     * This ensures that the context is still alive when the closure
-     * is invoked (as long as the runtime lives)
-     */
-    c->context = gjs_runtime_get_load_context(c->runtime);
+    c->context = context;
     JS_BeginRequest(c->context);
 
     c->obj = callable;

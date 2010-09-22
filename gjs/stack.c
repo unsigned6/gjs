@@ -41,10 +41,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include <config.h>
-#include "context-jsapi.h"
 #include <glib.h>
 #include <string.h>
 #include <jsdbgapi.h>
+#include "context.h"
 
 static const char*
 jsvalue_to_string(JSContext* cx, jsval val, gboolean* is_string)

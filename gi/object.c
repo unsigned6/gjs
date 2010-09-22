@@ -566,7 +566,10 @@ wrapped_gobj_toggle_notify(gpointer      data,
      * Or if !is_last_ref, we do not want to convert to a strong
      * ref since we want everything collected on runtime destroy.
      */
-    context = gjs_runtime_peek_load_context(runtime);
+    {
+        context = NULL;
+        JS_ContextIterator(runtime, &context);
+    }
     if (!context)
         return;
 
@@ -598,7 +601,7 @@ wrapped_gobj_toggle_notify(gpointer      data,
          */
         if (priv->keep_alive == NULL) {
             gjs_debug_lifecycle(GJS_DEBUG_GOBJECT, "Adding object to keep alive");
-            priv->keep_alive = gjs_keep_alive_get_for_load_context(runtime);
+            priv->keep_alive = gjs_keep_alive_get_for_context(context);
             gjs_keep_alive_add_child(context, priv->keep_alive,
                                      gobj_no_longer_kept_alive_func,
                                      obj,
@@ -746,7 +749,7 @@ object_instance_constructor(JSContext *context,
          * the wrapper to be garbage collected (and thus unref the
          * wrappee).
          */
-        priv->keep_alive = gjs_keep_alive_get_for_load_context(JS_GetRuntime(context));
+        priv->keep_alive = gjs_keep_alive_get_for_context(context);
         gjs_keep_alive_add_child(context,
                                  priv->keep_alive,
                                  gobj_no_longer_kept_alive_func,

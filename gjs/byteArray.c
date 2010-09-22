@@ -843,9 +843,8 @@ JSBool
 gjs_define_byte_array_stuff(JSContext      *context,
                             JSObject       *in_object)
 {
-    JSContext *load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
     JSObject *global = JS_GetGlobalObject(context);
-    gjs_byte_array_prototype = JS_InitClass(load_context, global,
+    gjs_byte_array_prototype = JS_InitClass(context, global,
                              NULL,
                              &gjs_byte_array_class,
                              byte_array_constructor,
@@ -857,14 +856,12 @@ gjs_define_byte_array_stuff(JSContext      *context,
     jsval rval;
 
     if (gjs_byte_array_prototype == NULL) {
-        gjs_move_exception(load_context, context);
         return JS_FALSE;
     }
 
     if (!gjs_object_require_property(
-            load_context, global, NULL,
+            context, global, NULL,
             "ByteArray", &rval)) {
-        gjs_move_exception(load_context, context);
         return JS_FALSE;
     }
 

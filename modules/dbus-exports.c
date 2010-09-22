@@ -1860,16 +1860,13 @@ gjs_js_define_dbus_exports(JSContext      *context,
                            DBusBusType     which_bus)
 {
     JSObject *exports;
-    JSContext *load_context;
     JSBool success;
 
     success = JS_FALSE;
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
-    JS_BeginRequest(load_context);
+    JS_BeginRequest(context);
 
-    exports = exports_new(load_context, which_bus);
+    exports = exports_new(context, which_bus);
     if (exports == NULL) {
-        gjs_move_exception(load_context, context);
         goto fail;
     }
 
@@ -1885,6 +1882,6 @@ gjs_js_define_dbus_exports(JSContext      *context,
 
     success = JS_TRUE;
  fail:
-    JS_EndRequest(load_context);
+    JS_EndRequest(context);
     return success;
 }

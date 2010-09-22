@@ -1036,16 +1036,12 @@ gjs_define_function(JSContext      *context,
                     GIFunctionInfo *info)
 {
     JSObject *function;
-    JSContext *load_context;
 
-    load_context = gjs_runtime_get_load_context(JS_GetRuntime(context));
-    JS_BeginRequest(load_context);
+    JS_BeginRequest(context);
 
-    function = function_new(load_context, info);
+    function = function_new(context, info);
     if (function == NULL) {
-        gjs_move_exception(load_context, context);
-
-        JS_EndRequest(load_context);
+        JS_EndRequest(context);
         return NULL;
     }
 
@@ -1056,11 +1052,11 @@ gjs_define_function(JSContext      *context,
                            GJS_MODULE_PROP_FLAGS)) {
         gjs_debug(GJS_DEBUG_GFUNCTION, "Failed to define function");
 
-        JS_EndRequest(load_context);
+        JS_EndRequest(context);
         return NULL;
     }
 
-    JS_EndRequest(load_context);
+    JS_EndRequest(context);
     return function;
 }
 
