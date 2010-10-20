@@ -565,10 +565,17 @@ gjs_init_class_dynamic(JSContext      *context,
 }
 
 gboolean
-gjs_check_constructing(JSContext *context)
+gjs_check_constructing(JSContext *context, jsval *vp)
 {
+    gboolean constructing;
+
     JS_BeginRequest(context);
-    if (!JS_IsConstructing(context)) {
+#ifdef JSFUN_CONSTRUCTOR
+    constructing = JS_IsConstructing(context, vp);
+#else
+    constructing = JS_IsConstructing(context);
+#endif
+    if (!constructing) {
         JS_EndRequest(context);
         gjs_throw(context,
                   "Constructor called as normal method. Use 'new SomeObject()' not 'SomeObject()'");
