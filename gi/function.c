@@ -755,11 +755,15 @@ release:
     }
 }
 
-/* this macro was introduced with JSFastNative in 2007 */
-#ifndef JS_ARGV_CALLEE
-#define JS_ARGV_CALLEE(argv)    ((argv)[-2])
-#endif
-
+#ifdef HAVE_JS_FAST_CONSTRUCTORS
+static JSBool
+function_call(JSContext *context,
+              uintN      js_argc,
+              jsval     *vp)
+{
+    jsval *js_argv = JS_ARGV(context, vp);
+    jsval *obj = JS_THIS_OBJECT(context, vp);
+#else
 static JSBool
 function_call(JSContext *context,
               JSObject  *obj, /* "this" object, not the function object */
@@ -767,6 +771,7 @@ function_call(JSContext *context,
               jsval     *js_argv,
               jsval     *rval)
 {
+#endif
     Function *priv;
     JSObject *callee;
 
