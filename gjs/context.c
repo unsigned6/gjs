@@ -93,11 +93,10 @@ static GList *all_contexts = NULL;
 
 static JSBool
 gjs_log(JSContext *context,
-        JSObject  *obj,
         uintN      argc,
-        jsval     *argv,
-        jsval     *retval)
+        jsval     *vp)
 {
+    jsval *argv = JS_ARGV(context, vp);
     char *s;
     JSExceptionState *exc_state;
     JSString *jstr;
@@ -137,11 +136,10 @@ gjs_log(JSContext *context,
 
 static JSBool
 gjs_log_error(JSContext *context,
-                 JSObject  *obj,
-                 uintN      argc,
-                 jsval     *argv,
-                 jsval     *retval)
+              uintN      argc,
+              jsval     *vp)
 {
+    jsval *argv = JS_ARGV(context, vp);
     char *s;
     JSExceptionState *exc_state;
     JSString *jstr;
@@ -243,11 +241,10 @@ gjs_print_parse_args(JSContext *context,
 
 static JSBool
 gjs_print(JSContext *context,
-          JSObject  *obj,
           uintN      argc,
-          jsval     *argv,
-          jsval     *retval)
+          jsval     *vp)
 {
+    jsval *argv = JS_ARGV(context, vp);
     char *buffer;
 
     if (!gjs_print_parse_args(context, argc, argv, &buffer)) {
@@ -262,11 +259,10 @@ gjs_print(JSContext *context,
 
 static JSBool
 gjs_printerr(JSContext *context,
-             JSObject  *obj,
              uintN      argc,
-             jsval     *argv,
-             jsval     *retval)
+             jsval     *vp)
 {
+    jsval *argv = JS_ARGV(context, vp);
     char *buffer;
 
     if (!gjs_print_parse_args(context, argc, argv, &buffer)) {
@@ -584,26 +580,26 @@ gjs_context_constructor (GType                  type,
     /* Define a global function called log() */
     if (!JS_DefineFunction(js_context->context, js_context->global,
                            "log",
-                           gjs_log,
-                           1, GJS_MODULE_PROP_FLAGS))
+                           (JSNative)gjs_log,
+                           1, GJS_MODULE_PROP_FLAGS | JSFUN_FAST_NATIVE))
         gjs_fatal("Failed to define log function");
 
     if (!JS_DefineFunction(js_context->context, js_context->global,
                            "logError",
-                           gjs_log_error,
-                           2, GJS_MODULE_PROP_FLAGS))
+                           (JSNative)gjs_log_error,
+                           2, GJS_MODULE_PROP_FLAGS | JSFUN_FAST_NATIVE))
         gjs_fatal("Failed to define logError function");
 
     /* Define global functions called print() and printerr() */
     if (!JS_DefineFunction(js_context->context, js_context->global,
                            "print",
-                           gjs_print,
-                           3, GJS_MODULE_PROP_FLAGS))
+                           (JSNative)gjs_print,
+                           3, GJS_MODULE_PROP_FLAGS | JSFUN_FAST_NATIVE))
         gjs_fatal("Failed to define print function");
     if (!JS_DefineFunction(js_context->context, js_context->global,
                            "printerr",
-                           gjs_printerr,
-                           4, GJS_MODULE_PROP_FLAGS))
+                           (JSNative)gjs_printerr,
+                           4, GJS_MODULE_PROP_FLAGS | JSFUN_FAST_NATIVE))
         gjs_fatal("Failed to define printerr function");
 
     /* We need to know what the default context is, since it's the context whose
