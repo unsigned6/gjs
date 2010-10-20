@@ -30,6 +30,7 @@
 #define __GJS_COMPAT_H__
 
 #include <jsapi.h>
+#include <glib.h>
 
 G_BEGIN_DECLS
 
@@ -68,6 +69,37 @@ G_BEGIN_DECLS
 #ifdef JSFUN_CONSTRUCTOR
 /* All functions are "fast", so define this to a no-op */
 #define JSFUN_FAST_NATIVE 0
+
+#define GJS_NATIVE_CONSTRUCTOR_DECLARE(name)            \
+static JSBool                                           \
+gjs_##name##_constructor(JSContext  *context,           \
+                         uintN       argc,              \
+                         jsval      *vp)
+
+#define GJS_NATIVE_CONSTRUCTOR_VARIABLES                   \
+    JSObject *object = JSVAL_TO_OBJECT(JS_CALLEE(cx, vp)); \
+    jsval *argv = JS_ARGV(context, vp);
+
+#define GJS_NATIVE_CONSTRUCTOR_PRELUDE                  \
+    if (!gjs_check_constructing(context, vp))           \
+        return JS_FALSE
+
+#else
+
+#define GJS_NATIVE_CONSTRUCTOR_DECLARE(name)            \
+static JSBool                                           \
+gjs_##name##_constructor(JSContext *context,            \
+                         JSObject  *object,             \
+                         uintN      argc,               \
+                         jsval     *argv,               \
+                         jsval     *retval)
+
+#define GJS_NATIVE_CONSTRUCTOR_VARIABLES
+
+#define GJS_NATIVE_CONSTRUCTOR_PRELUDE                  \
+    if (!gjs_check_constructing(context, NULL))         \
+        return JS_FALSE
+
 #endif
 
 G_END_DECLS

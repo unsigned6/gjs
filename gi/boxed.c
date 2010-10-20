@@ -410,13 +410,9 @@ boxed_init(JSContext   *context,
  * identify the prototype as an object of our class with NULL private
  * data.
  */
-static JSBool
-boxed_constructor(JSContext *context,
-                  JSObject  *obj,
-                  uintN      argc,
-                  jsval     *argv,
-                  jsval     *retval)
+GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
 {
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES
     Boxed *priv;
     Boxed *proto_priv;
     JSClass *obj_class;
@@ -424,27 +420,26 @@ boxed_constructor(JSContext *context,
     JSObject *proto;
     gboolean is_proto;
 
-    if (!gjs_check_constructing(context))
-        return JS_FALSE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
 
     priv = g_slice_new0(Boxed);
 
     GJS_INC_COUNTER(boxed);
 
-    JS_SetPrivate(context, obj, priv);
+    JS_SetPrivate(context, object, priv);
 
     gjs_debug_lifecycle(GJS_DEBUG_GBOXED,
                         "boxed constructor, obj %p priv %p",
-                        obj, priv);
+                        object, priv);
 
-    proto = JS_GetPrototype(context, obj);
+    proto = JS_GetPrototype(context, object);
     gjs_debug_lifecycle(GJS_DEBUG_GBOXED, "boxed instance __proto__ is %p", proto);
 
     /* If we're constructing the prototype, its __proto__ is not the same
      * class as us, but if we're constructing an instance, the prototype
      * has the same class.
      */
-    obj_class = JS_GET_CLASS(context, obj);
+    obj_class = JS_GET_CLASS(context, object);
     proto_class = JS_GET_CLASS(context, proto);
 
     is_proto = (obj_class != proto_class);
@@ -494,10 +489,10 @@ boxed_constructor(JSContext *context,
                 }
             }
 
-            if (!boxed_new(context, obj, priv))
+            if (!boxed_new(context, object, priv))
                 return JS_FALSE;
 
-            if (!boxed_init(context, obj, priv, argc, argv))
+            if (!boxed_init(context, object, priv, argc, argv))
                 return JS_FALSE;
 
         } else if (!JSVAL_IS_NULL(unthreadsafe_template_for_constructor.parent_jsval)) {
@@ -509,7 +504,7 @@ boxed_constructor(JSContext *context,
             /* We never actually read the reserved slot, but we put the parent object
              * into it to hold onto the parent object.
              */
-            JS_SetReservedSlot(context, obj, 0,
+            JS_SetReservedSlot(context, object, 0,
                                unthreadsafe_template_for_constructor.parent_jsval);
 
             unthreadsafe_template_for_constructor.parent_jsval = JSVAL_NULL;
@@ -529,7 +524,7 @@ boxed_constructor(JSContext *context,
                 priv->gboxed = g_boxed_copy(gtype,
                                             unthreadsafe_template_for_constructor.gboxed);
             } else if (priv->can_allocate_directly) {
-                if (!boxed_new_direct(context, obj, priv))
+                if (!boxed_new_direct(context, object, priv))
                     return JS_FALSE;
 
                 memcpy(priv->gboxed,
@@ -1163,7 +1158,7 @@ gjs_define_boxed_class(JSContext    *context,
                                            * none - just name the prototype like
                                            * Math - rarely correct)
                                            */
-                                          boxed_constructor,
+                                          gjs_boxed_constructor,
                                           /* number of constructor args (less can be passed) */
                                           1,
                                           /* props of prototype */
