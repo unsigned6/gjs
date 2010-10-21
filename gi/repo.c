@@ -163,10 +163,10 @@ repo_new_resolve(JSContext *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(repo)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(repo)
     Repo *priv;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(repo);
 
     priv = g_slice_new0(Repo);
 
@@ -177,6 +177,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(repo)
 
     gjs_debug_lifecycle(GJS_DEBUG_GREPO,
                         "repo constructor, obj %p priv %p", object, priv);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(repo);
 
     return JS_TRUE;
 }

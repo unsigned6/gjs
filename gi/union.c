@@ -203,7 +203,7 @@ union_new(JSContext   *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(union)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(union)
     Union *priv;
     Union *proto_priv;
     JSClass *obj_class;
@@ -211,7 +211,7 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(union)
     JSObject *proto;
     gboolean is_proto;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(union);
 
     priv = g_slice_new0(Union);
 
@@ -298,6 +298,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(union)
                             "JSObject created with union instance %p type %s",
                             priv->gboxed, g_type_name(gtype));
     }
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(union);
 
     return JS_TRUE;
 }

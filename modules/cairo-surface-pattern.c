@@ -31,12 +31,12 @@ GJS_DEFINE_PROTO("CairoSurfacePattern", cairo_surface_pattern)
 
 GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_surface_pattern)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(cairo_surface_pattern)
     JSObject *surface_wrapper;
     cairo_surface_t *surface;
     cairo_pattern_t *pattern;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(cairo_surface_pattern);
 
     if (!gjs_parse_args(context, "SurfacePattern", "o", argc, argv,
                         "surface", &surface_wrapper))
@@ -55,6 +55,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_surface_pattern)
 
     gjs_cairo_pattern_construct(context, object, pattern);
     cairo_pattern_destroy(pattern);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(cairo_surface_pattern);
 
     return JS_TRUE;
 }

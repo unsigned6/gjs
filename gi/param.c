@@ -144,7 +144,7 @@ param_new_resolve(JSContext *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(param)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(param)
     Param *priv;
     Param *proto_priv;
     JSClass *obj_class;
@@ -152,7 +152,7 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(param)
     JSObject *proto;
     gboolean is_proto;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(param);
 
     priv = g_slice_new0(Param);
 
@@ -208,6 +208,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(param)
                   "JSObject created with param instance %p type %s",
                   priv->gparam, g_type_name(G_TYPE_FROM_INSTANCE((GTypeInstance*) priv->gparam)));
     }
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(param);
 
     return JS_TRUE;
 }

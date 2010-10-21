@@ -31,11 +31,11 @@ GJS_DEFINE_PROTO("CairoRadialGradient", cairo_radial_gradient)
 
 GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_radial_gradient)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(cairo_radial_gradient)
     double cx0, cy0, radius0, cx1, cy1, radius1;
     cairo_pattern_t *pattern;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(cairo_radial_gradient);
 
     if (!gjs_parse_args(context, "RadialGradient", "ffffff", argc, argv,
                         "cx0", &cx0,
@@ -53,6 +53,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_radial_gradient)
 
     gjs_cairo_pattern_construct(context, object, pattern);
     cairo_pattern_destroy(pattern);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(cairo_radial_gradient);
 
     return JS_TRUE;
 }

@@ -430,7 +430,7 @@ gjs_g_byte_array_new(int preallocated_length)
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(byte_array)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(byte_array)
     ByteArrayInstance *priv;
     JSObject *proto;
     gboolean is_proto;
@@ -438,7 +438,7 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(byte_array)
     JSClass *proto_class;
     gsize preallocated_length;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(byte_array);
 
     preallocated_length = 0;
     if (argc >= 1) {
@@ -469,6 +469,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(byte_array)
     if (!is_proto) {
         priv->array = gjs_g_byte_array_new(preallocated_length);
     }
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(byte_array);
 
     return JS_TRUE;
 }

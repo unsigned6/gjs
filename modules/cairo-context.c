@@ -253,12 +253,12 @@ _gjs_cairo_context_construct_internal(JSContext *context,
 
 GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_context)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(cairo_context)
     JSObject *surface_wrapper;
     cairo_surface_t *surface;
     cairo_t *cr;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(cairo_context);
 
     if (!gjs_parse_args(context, "Context", "o", argc, argv,
                         "surface", &surface_wrapper))
@@ -277,6 +277,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_context)
 
     _gjs_cairo_context_construct_internal(context, object, cr);
     cairo_destroy(cr);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(cairo_context);
 
     return JS_TRUE;
 }

@@ -412,7 +412,7 @@ boxed_init(JSContext   *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(boxed)
     Boxed *priv;
     Boxed *proto_priv;
     JSClass *obj_class;
@@ -420,7 +420,7 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
     JSObject *proto;
     gboolean is_proto;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(boxed);
 
     priv = g_slice_new0(Boxed);
 
@@ -541,6 +541,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
             return priv->gboxed != NULL;
         }
     }
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(boxed);
 
     return JS_TRUE;
 }
