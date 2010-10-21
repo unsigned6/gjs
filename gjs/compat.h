@@ -70,20 +70,49 @@ G_BEGIN_DECLS
 /* All functions are "fast", so define this to a no-op */
 #define JSFUN_FAST_NATIVE 0
 
+/**
+ * GJS_NATIVE_CONSTRUCTOR_DECLARE:
+ * Prototype a constructor.
+ */
 #define GJS_NATIVE_CONSTRUCTOR_DECLARE(name)            \
 static JSBool                                           \
 gjs_##name##_constructor(JSContext  *context,           \
                          uintN       argc,              \
                          jsval      *vp)
 
-#define GJS_NATIVE_CONSTRUCTOR_VARIABLES                   \
-    JSObject *object = JSVAL_TO_OBJECT(JS_CALLEE(cx, vp)); \
+/**
+ * GJS_NATIVE_CONSTRUCTOR_VARIABLES:
+ * Declare variables necessary for the constructor; should
+ * be at the very top.
+ */
+#define GJS_NATIVE_CONSTRUCTOR_VARIABLES(name)          \
+    JSObject *object = NULL;                            \
     jsval *argv = JS_ARGV(context, vp);
 
-#define GJS_NATIVE_CONSTRUCTOR_PRELUDE                  \
-    if (!gjs_check_constructing(context, vp))           \
-        return JS_FALSE
+/**
+ * GJS_NATIVE_CONSTRUCTOR_PRELUDE:
+ * Call after the initial variable declaration.
+ */
+#define GJS_NATIVE_CONSTRUCTOR_PRELUDE(name)                                         \
+    {                                                                                \
+        if (!JS_IsConstructing_PossiblyWithGivenThisObject(context, vp, &object)) {  \
+            gjs_throw_constructor_error(context);                                    \
+            return JS_FALSE;                                                         \
+        }                                                                            \
+        if (object == NULL)                                                          \
+            object = JS_NewObject(context, &gjs_##name##_class, NULL, NULL);         \
+        if (object == NULL)                                                          \
+            return JS_FALSE;                                                         \
+    }
 
+
+/**
+ * GJS_NATIVE_CONSTRUCTOR_FINISH:
+ * Call this at the end of a constructor when it's completed
+ * successfully.
+ */
+#define GJS_NATIVE_CONSTRUCTOR_FINISH(name)             \
+    JS_SET_RVAL(context, vp, OBJECT_TO_JSVAL(object));
 #else
 
 #define GJS_NATIVE_CONSTRUCTOR_DECLARE(name)            \
@@ -94,11 +123,15 @@ gjs_##name##_constructor(JSContext *context,            \
                          jsval     *argv,               \
                          jsval     *retval)
 
-#define GJS_NATIVE_CONSTRUCTOR_VARIABLES
+#define GJS_NATIVE_CONSTRUCTOR_VARIABLES(name)
 
-#define GJS_NATIVE_CONSTRUCTOR_PRELUDE                  \
-    if (!gjs_check_constructing(context, NULL))         \
-        return JS_FALSE
+#define GJS_NATIVE_CONSTRUCTOR_PRELUDE(name)            \
+    if (!JS_IsConstructing(context)) {                  \
+        gjs_throw_constructor_error(context);           \
+        return JS_FALSE;                                \
+    }
+
+#define GJS_NATIVE_CONSTRUCTOR_FINISH(name)
 
 #endif
 

@@ -1685,12 +1685,12 @@ exports_new_resolve(JSContext *context,
  * identify the prototype as an object of our class with NULL private
  * data.
  */
-GJS_NATIVE_CONSTRUCTOR_DECLARE(exports)
+GJS_NATIVE_CONSTRUCTOR_DECLARE(js_exports)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(js_exports)
     Exports *priv;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(js_exports);
 
     priv = g_slice_new0(Exports);
 
@@ -1704,6 +1704,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(exports)
 
     priv->runtime = JS_GetRuntime(context);
     priv->object = object;
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(js_exports);
 
     return JS_TRUE;
 }
@@ -1823,7 +1825,7 @@ exports_new(JSContext  *context,
                                   * none - just name the prototype like
                                   * Math - rarely correct)
                                   */
-                                 gjs_exports_constructor,
+                                 gjs_js_exports_constructor,
                                  /* number of constructor args */
                                  0,
                                  /* props of prototype */

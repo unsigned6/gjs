@@ -31,11 +31,11 @@ GJS_DEFINE_PROTO("CairoImageSurface", cairo_image_surface)
 
 GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_image_surface)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(cairo_image_surface)
     int format, width, height;
     cairo_surface_t *surface;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(cairo_image_surface);
 
     // create_for_data optional parameter
     if (!gjs_parse_args(context, "ImageSurface", "iii", argc, argv,
@@ -51,6 +51,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_image_surface)
 
     gjs_cairo_surface_construct(context, object, surface);
     cairo_surface_destroy(surface);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(cairo_image_surface);
 
     return JS_TRUE;
 }

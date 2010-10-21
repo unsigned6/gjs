@@ -958,10 +958,10 @@ importer_new_resolve(JSContext *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(importer)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(importer)
     Importer *priv;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(importer);
 
     priv = g_slice_new0(Importer);
 
@@ -972,6 +972,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(importer)
 
     gjs_debug_lifecycle(GJS_DEBUG_IMPORTER,
                         "importer constructor, obj %p priv %p", object, priv);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(importer);
 
     return JS_TRUE;
 }

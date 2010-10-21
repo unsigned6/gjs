@@ -617,7 +617,7 @@ wrapped_gobj_toggle_notify(gpointer      data,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(object_instance)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(object_instance)
     ObjectInstance *priv;
     ObjectInstance *proto_priv;
     JSObject *proto;
@@ -625,7 +625,7 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(object_instance)
     JSClass *obj_class;
     JSClass *proto_class;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(object_instance);
 
     priv = g_slice_new0(ObjectInstance);
 
@@ -765,6 +765,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(object_instance)
         TRACE(GJS_OBJECT_PROXY_NEW(priv, priv->gobj, g_base_info_get_namespace ( (GIBaseInfo*) priv->info),
                                     g_base_info_get_name ( (GIBaseInfo*) priv->info) ));
     }
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(object_instance);
 
     return JS_TRUE;
 }

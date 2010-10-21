@@ -31,11 +31,11 @@ GJS_DEFINE_PROTO("CairoLinearGradient", cairo_linear_gradient)
 
 GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_linear_gradient)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(cairo_linear_gradient)
     double x0, y0, x1, y1;
     cairo_pattern_t *pattern;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(cairo_linear_gradient);
 
     if (!gjs_parse_args(context, "LinearGradient", "ffff", argc, argv,
                         "x0", &x0,
@@ -51,6 +51,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(cairo_linear_gradient)
 
     gjs_cairo_pattern_construct(context, object, pattern);
     cairo_pattern_destroy(pattern);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(cairo_linear_gradient);
 
     return JS_TRUE;
 }

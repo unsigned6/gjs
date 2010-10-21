@@ -149,10 +149,10 @@ ns_new_resolve(JSContext *context,
  */
 GJS_NATIVE_CONSTRUCTOR_DECLARE(ns)
 {
-    GJS_NATIVE_CONSTRUCTOR_VARIABLES
+    GJS_NATIVE_CONSTRUCTOR_VARIABLES(ns)
     Ns *priv;
 
-    GJS_NATIVE_CONSTRUCTOR_PRELUDE;
+    GJS_NATIVE_CONSTRUCTOR_PRELUDE(ns);
 
     priv = g_slice_new0(Ns);
 
@@ -162,6 +162,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(ns)
     JS_SetPrivate(context, object, priv);
 
     gjs_debug_lifecycle(GJS_DEBUG_GNAMESPACE, "ns constructor, obj %p priv %p", object, priv);
+
+    GJS_NATIVE_CONSTRUCTOR_FINISH(ns);
 
     return JS_TRUE;
 }
