@@ -431,7 +431,6 @@ boxed_constructor(JSContext *context,
 
     GJS_INC_COUNTER(boxed);
 
-    g_assert(priv_from_js(context, obj) == NULL);
     JS_SetPrivate(context, obj, priv);
 
     gjs_debug_lifecycle(GJS_DEBUG_GBOXED,
@@ -1175,8 +1174,10 @@ gjs_define_boxed_class(JSContext    *context,
                                           NULL,
                                           /* funcs of constructor, MyConstructor.myfunc() */
                                           NULL);
-    if (prototype == NULL)
+    if (prototype == NULL) {
+        gjs_log_exception(context, NULL);
         gjs_fatal("Can't init class %s", constructor_name);
+    }
 
     g_assert(gjs_object_has_property(context, in_object, constructor_name));
 
