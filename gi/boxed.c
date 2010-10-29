@@ -516,7 +516,8 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
             unthreadsafe_template_for_constructor.gboxed = NULL;
         } else {
             GType gtype = g_registered_type_info_get_g_type( (GIRegisteredTypeInfo*) priv->info);
-
+            JSBool retval;
+            
             if (gtype != G_TYPE_NONE) {
                 priv->gboxed = g_boxed_copy(gtype,
                                             unthreadsafe_template_for_constructor.gboxed);
@@ -535,7 +536,10 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(boxed)
 
             unthreadsafe_template_for_constructor.gboxed = NULL;
 
-            return priv->gboxed != NULL;
+            retval = priv->gboxed != NULL;
+            if (retval)
+                GJS_NATIVE_CONSTRUCTOR_FINISH(boxed);
+            return retval;
         }
     }
 
