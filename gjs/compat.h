@@ -100,7 +100,7 @@ gjs_##name##_constructor(JSContext  *context,           \
             return JS_FALSE;                                                         \
         }                                                                            \
         if (object == NULL)                                                          \
-            object = JS_NewObject(context, &gjs_##name##_class, NULL, NULL);         \
+            object = JS_NewObjectForConstructor(context, vp);                        \
         if (object == NULL)                                                          \
             return JS_FALSE;                                                         \
     }

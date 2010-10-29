@@ -791,7 +791,8 @@ function_call(JSContext *context,
     {
         jsval retval;
         success = gjs_invoke_c_function(context, priv, object, js_argc, js_argv, &retval);
-        JS_SET_RVAL(context, vp, retval);
+        if (success)
+            JS_SET_RVAL(context, vp, retval);
     }
 #else
     success = gjs_invoke_c_function(context, priv, object, js_argc, js_argv, retval);
@@ -819,7 +820,7 @@ function_constructor(JSContext *context,
         return JS_FALSE;
     }
     if (object == NULL)
-        object = JS_NewObject(context, &gjs_function_class, NULL, NULL);
+        object = JS_NewObjectForConstructor(context, vp);
 #else
 static JSBool
 function_constructor(JSContext *context,
@@ -840,6 +841,9 @@ function_constructor(JSContext *context,
 
     gjs_debug_lifecycle(GJS_DEBUG_GFUNCTION,
                         "function constructor, obj %p priv %p", object, priv);
+#ifdef JSFUN_CONSTRUCTOR
+    JS_SET_RVAL(context, vp, OBJECT_TO_JSVAL(object));
+#endif
 
     return JS_TRUE;
 }
