@@ -160,6 +160,7 @@ AC_CHECK_LIB([mozjs], [JS_GetFunctionName], AC_DEFINE([HAVE_JS_GETFUNCTIONNAME],
 AC_CHECK_LIB([mozjs], [JS_GetStringChars], AC_DEFINE([HAVE_JS_GETSTRINGCHARS], [1], [Define if we still have JS_GetStringChars]),, [$JS_LIBS])
 AC_CHECK_LIB([mozjs], [JS_StrictPropertyStub], AC_DEFINE([HAVE_JS_STRICTPROPERTYSTUB], [1], [Define if we have JS_StrictPropertyStub]),, [$JS_LIBS])
 AC_CHECK_LIB([mozjs], [JS_GetGlobalForScopeChain], AC_DEFINE([HAVE_JS_GETGLOBALFORSCOPECHAIN], [1], [Define if we have JS_GetGlobalForScopeChain]),, [$JS_LIBS])
+AC_CHECK_LIB([mozjs], [JS_DestroyScript], AC_DEFINE([HAVE_JS_DESTROYSCRIPT], [1], [Define if we still have JS_DestroyScript]),, [$JS_LIBS])
 
 AC_MSG_CHECKING([for mozilla-js >= 2 ])
 if `$PKG_CONFIG --exists $JS_PACKAGE '>=' 2`; then
