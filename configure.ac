@@ -230,6 +230,30 @@ if test "$have_jslocale_to_unicode_const" = yes; then
      AC_DEFINE([JS_LOCALETOUNICODE_NEEDS_CONST_CHAR], [1], [Define if JSLocaleToUnicode takes a const char* for its src])
 fi
 
+save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS $JS_CFLAGS"
+AC_MSG_CHECKING([for JS_CLASS_TRACE macro])
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[
+            #include <jsapi.h>
+	    #ifndef JS_CLASS_TRACE
+	    #error "No JS_CLASS_TRACE"
+	    #endif
+        ]],
+        [[(void) 0;]]
+    )],
+    [have_js_class_trace=yes],
+    [have_js_class_trace=no])
+
+if test "x$have_js_class_trace" = xyes; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_JS_CLASS_TRACE], [1], [Define if we still have JS_CLASS_TRACE])
+else
+    AC_MSG_RESULT([no])
+fi
+CFLAGS="$save_CFLAGS"
+
 common_packages="gobject-2.0 >= gobject_required_version $JS_PACKAGE"
 gjs_packages="gmodule-2.0 gthread-2.0 $common_packages"
 gjs_gi_packages="gobject-introspection-1.0 >= 0.10.1 $common_packages"
