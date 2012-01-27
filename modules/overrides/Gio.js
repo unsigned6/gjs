@@ -381,7 +381,14 @@ const DBusImplementerBase = new Lang.Class({
 	let klass = this.constructor;
 
 	let propInfo = klass.Interface.lookup_property(property_name);
-	let jsval = this[property_name];
+
+        // Properties like "Name" may collide with regular class usage,
+        // so try prefixing with "DBus" first.
+        let jsval;
+        jsval = this['DBus' + property_name];
+        if (jsval === undefined)
+            jsval = this[property_name];
+
 	if (jsval != undefined)
 	    return GLib.Variant.new(propInfo.signature, jsval);
 	else
