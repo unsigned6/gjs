@@ -54,10 +54,10 @@ function _proxyInvoker(methodName, sync, inSignature, arg_array) {
 
     if (arg_array.length < minNumberArgs) {
         throw new Error("Not enough arguments passed for method: " + methodName +
-                       ". Expected " + minNumberArgs + ", got " + arg_array.length);
+                        ". Expected " + minNumberArgs + ", got " + arg_array.length);
     } else if (arg_array.length > maxNumberArgs) {
         throw new Error("Too many arguments passed for method: " + methodName +
-                       ". Maximum is " + maxNumberArgs +
+                        ". Maximum is " + maxNumberArgs +
                         " + one callback and/or flags");
     }
 
@@ -109,7 +109,7 @@ function _logReply(result, exc) {
     }
 }
 
-function _makeProxyMethod(method, sync) {
+function _makeProxyMethod(method, sync, insideClass) {
     var i;
     var name = method.name;
     var inArgs = method.in_args;
@@ -117,9 +117,14 @@ function _makeProxyMethod(method, sync) {
     for (i = 0; i < inArgs.length; i++)
         inSignature.push(inArgs[i].signature);
 
-    return function() {
+    var f = function() {
         return _proxyInvoker.call(this, name, sync, inSignature, arguments);
-    };
+    }
+
+    if (insideClass)
+        return this.wrapFunction(method, f);
+    else
+        return f;
 }
 
 function _convertToNativeSignal(proxy, sender_name, signal_name, parameters) {
@@ -151,6 +156,10 @@ function _propertySetter(value, name, signature) {
 }
 
 function _addDBusConvenience() {
+    // Check if this is actually using new-style bindings
+    if (this.constructor instanceof DBusProxyClass)
+        return;
+
     let info = this.g_interface_info;
     if (!info)
         return;
@@ -175,7 +184,100 @@ function _addDBusConvenience() {
     }
 }
 
+const DBusProxyClass = new Lang.Class({
+    Name: 'DBusProxyClass',
+    Extends: GObject.Class,
+
+    _construct: function(params) {
+        params.Extends = Gio.DBusProxy;
+
+        return this.parent(params);
+    },
+
+    _init: function(classParams) {
+        if (!classParams.Interface)
+            throw new TypeError('Interface must be specified in the declaration of a DBusProxyClass');
+        if (!(classParams.Interface instanceof Gio.DBusInterfaceInfo))
+            classParams.Interface = _newInterfaceInfo(classParams.Interface);
+
+        classParams._init = function(params) {
+            let klass = this.constructor;
+            if (!params)
+                params = { };
+            params.g_interface_name = this.Interface.name;
+            params.g_interface_info = this.Interface;
+
+            let asyncCallback, cancellable = null;
+            if ('g_async_callback' in params) {
+                asyncCallback = params.g_async_callback;
+                delete params.g_async_callback;
+            }
+            if ('g_cancellable' in params) {
+                cancellable = params.g_cancellable;
+                delete params.g_cancellable;
+            }
+
+            this.parent(params);
+
+            if (asyncCallback) {
+                this.init_async(GLib.PRIORITY_DEFAULT, cancellable, function(initable, result) {
+                    try {
+                        initable.init_finish(result);
+                        asyncCallback(initable, null);
+                    } catch(e) {
+                        asyncCallback(null, e);
+                    }
+                });
+            } else {
+                this.init(cancellable);
+            }
+
+            this.connect('g-signal', _convertToNativeSignal);
+        }
+
+        // build the actual class
+        this.parent(classParams);
+
+        // add convenience methods
+        this._addDBusConvenience(classParams);
+    },
+
+    _addDBusConvenience: function(classParams) {
+        let info = classParams.Interface;
+
+        let i, methods = info.methods;
+        for (i = 0; i < methods.length; i++) {
+            var method = methods[i];
+            this.prototype[method.name + 'Remote'] = _makeProxyMethod.call(this, methods[i], false, true);
+            this.prototype[method.name + 'Sync'] = _makeProxyMethod.call(this, methods[i], true, true);
+        }
+
+        let properties = info.properties;
+        for (i = 0; i < properties.length; i++) {
+            let name = properties[i].name;
+            let signature = properties[i].signature;
+            let flags = properties[i].flags;
+            let getter = undefined, setter = undefined;
+
+            if (flags & Gio.DBusPropertyInfoFlags.READABLE) {
+                getter = function() {
+                    return _propertyGetter.call(this, name);
+                };
+            }
+            if (flags & Gio.DBusPropertyInfoFlags.WRITABLE) {
+                setter = function(val) {
+                    return _propertySetter.call(this, name, val, signature);
+                };
+            }
+
+            Lang.defineAccessorProperty(this.prototype, name, getter, setter);
+        }
+    }
+});
+
 function _makeProxyWrapper(interfaceXml) {
+    log ('makeProxyWrapper is deprecated. Use Gio.DBusProxyClass instead');
+
     var info = _newInterfaceInfo(interfaceXml);
     var iname = info.name;
     return function(bus, name, object, asyncCallback, cancellable) {
@@ -329,6 +431,91 @@ function _handlePropertySet(info, impl, property_name, new_value) {
     this[property_name] = new_value.deep_unpack();
 }
 
+const DBusImplementerBase = new Lang.Class({
+    Name: 'DBusImplementerBase',
+
+    _init: function() {
+        this._dbusImpl = new GjsPrivate.DBusImplementation({ g_interface_info: this.constructor.Interface });
+
+        this._dbusImpl.connect('handle-method-call', Lang.bind(this, this._handleMethodCall));
+        this._dbusImpl.connect('handle-property-get', Lang.bind(this, this._handlePropertyGet));
+        this._dbusImpl.connect('handle-property-set', Lang.bind(this, this._handlePropertySet));
+
+        let klass = this.constructor;
+        if (klass.ObjectPath && klass.BusType)
+            this.export(Gio.bus_get_sync(klass.BusType, null), klass.ObjectPath);
+    },
+
+    _handleMethodCall: function(impl, method_name, parameters, invocation) {
+        return _handleMethodCall.call(this, this.constructor.Interface, impl, method_name, parameters, invocation);
+    },
+
+    _handlePropertyGet: function(impl, property_name) {
+        return _handlePropertyGet.call(this, this.constructor.Interface, impl, property_name);
+    },
+
+    _handlePropertySet: function(impl, property_name, value) {
+        return _handlePropertySet.call(this, this.constructor.Interface, impl, property_name, value);
+    },
+
+    export: function(bus, path) {
+        this._dbusImpl.export(bus, path);
+    },
+
+    unexport: function() {
+        this._dbusImpl.unexport();
+    },
+
+    emit_signal: function(signal_name) {
+        let klass = this.constructor;
+
+        let signalInfo = klass.Interface.lookup_signal(signal_name);
+        let signalType = _makeOutSignature(signalInfo.args);
+
+        let argArray = Array.prototype.slice.call(arguments);
+        argArray.shift();
+
+        if (argArray.length == 0)
+            this._dbusImpl.emit_signal(signal_name, null);
+        else
+            this._dbusImpl.emit_signal(signal_name, GLib.Variant.new(signalType, argArray));
+    },
+
+    emit_property_changed: function(property_name, new_value) {
+        let klass = this.constructor;
+
+        let propertyInfo = klass.Inteface.lookup_property(property_name);
+        if (new_value != undefined)
+            new_value = GLib.Variant.new(propertyInfo.signature, new_value);
+
+        this._dbusImpl.emit_property_changed(property_name, new_value);
+    },
+});
+
+const DBusImplementerClass = new Lang.Class({
+    Name: 'DBusImplementerClass',
+    Extends: Lang.Class,
+
+    _construct: function(params) {
+        params.Extends = DBusImplementerBase;
+
+        return this.parent(params);
+    },
+
+    _init: function(params) {
+        if (!params.Interface)
+            throw new TypeError('Interface must be specified in the declaration of a DBusImplementerClass');
+        if (!(params.Interface instanceof Gio.DBusInterfaceInfo))
+            params.Interface = _newInterfaceInfo(params.Interface);
+        params.Interface.cache_build();
+
+        this.Interface = params.Interface;
+        delete params.Interface;
+
+        this.parent(params);
+    }
+});
+
 function _wrapJSObject(interfaceInfo, jsObj) {
     var info;
     if (interfaceInfo instanceof Gio.DBusInterfaceInfo)
@@ -391,6 +578,9 @@ function _init() {
 
     _injectToMethod(Gio.DBusProxy.prototype, 'init', _addDBusConvenience);
     _injectToMethod(Gio.DBusProxy.prototype, 'init_async', _addDBusConvenience);
+
+    Gio.DBusProxyClass = DBusProxyClass;
+    Gio.DBusProxy.prototype.__metaclass__ = DBusProxyClass;
     Gio.DBusProxy.prototype.connectSignal = Signals._connect;
     Gio.DBusProxy.prototype.disconnectSignal = Signals._disconnect;
 
@@ -400,6 +590,7 @@ function _init() {
     _wrapFunction(Gio.DBusNodeInfo, 'new_for_xml', _newNodeInfo);
     Gio.DBusInterfaceInfo.new_for_xml = _newInterfaceInfo;
 
+    Gio.DBusImplementerClass = DBusImplementerClass;
     Gio.DBusExportedObject = GjsPrivate.DBusImplementation;
     Gio.DBusExportedObject.wrapJSObject = _wrapJSObject;
 }
