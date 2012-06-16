@@ -232,106 +232,133 @@ function testInitStuff() {
     var theError;
     proxy = new TestProxy({ g_connection: Gio.DBus.session,
                             g_name: 'org.gnome.gjs.Test',
-                            g_object_path: '/org/gnome/gjs/Test',
-                            g_async_callback: function (obj, error) {
-                                theError = error;
-                                proxy = obj;
+                            g_object_path: '/org/gnome/gjs/Test'
+                          });
+    proxy.init_async(GLib.PRIORITY_DEFAULT, null, function (obj, result) {
+        try {
+            obj.init_finish(result);
+        } catch(error) {
+            theError = error;
+            proxy = obj;
+        }
 
-                                Mainloop.quit('testGDBus');
-                            } });
-
-    log(typeof(proxy._init) + " " + typeof(proxy._construct) + " " + typeof(proxy.frobateStuffRemote));
-
-    Mainloop.run('testGDBus');
-
-    assertNull(theError);
-    assertNotNull(proxy);
-}
-
-function testFrobateStuff() {
-    let theResult, theExcp;
-    proxy.frobateStuffRemote({}, function(result, excp) {
-        theResult = result;
-        theExcp = excp;
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
-    assertNull(theExcp);
-    assertEquals("world", theResult[0].hello.deep_unpack());
+    assertUndefined(theError);
+    assertNotUndefined(proxy);
+}
+
+function testFrobateStuff() {
+    let theResult, theExcp;
+    proxy.frobateStuffRemote({}, null, function(proxy, result) {
+        try {
+            [theResult] = proxy.frobateStuffFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
+        Mainloop.quit('testGDBus');
+    });
+
+    Mainloop.run('testGDBus');
+
+    assertUndefined(theExcp);
+    assertEquals("world", theResult.hello.deep_unpack());
 }
 
 /* excp must be exactly the exception thrown by the remote method
    (more or less) */
 function testThrowException() {
     let theResult, theExcp;
-    proxy.alwaysThrowExceptionRemote({}, function(result, excp) {
-        theResult = result;
-        theExcp = excp;
+    proxy.alwaysThrowExceptionRemote({}, null, function(proxy, result) {
+        try {
+            [theResult] = proxy.alwaysThrowExceptionFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
-    assertNull(theResult);
-    assertNotNull(theExcp);
+    assertUndefined(theResult);
+    assertNotUndefined(theExcp);
 }
 
 function testNonJsonFrobateStuff() {
     let theResult, theExcp;
-    proxy.nonJsonFrobateStuffRemote(42, function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.nonJsonFrobateStuffRemote(42, null, function(proxy, result) {
+        try {
+            [theResult] = proxy.nonJsonFrobateStuffFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
     assertEquals("42 it is!", theResult);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testNoInParameter() {
     let theResult, theExcp;
-    proxy.noInParameterRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.noInParameterRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.noInParameterFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
     assertEquals("Yes!", theResult);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testMultipleInArgs() {
     let theResult, theExcp;
-    proxy.multipleInArgsRemote(1, 2, 3, 4, 5, function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.multipleInArgsRemote(1, 2, 3, 4, 5, null, function(proxy, result) {
+        try {
+            [theResult] = proxy.multipleInArgsFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
     assertEquals("1 2 3 4 5", theResult);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testNoReturnValue() {
     let theResult, theExcp;
-    proxy.noReturnValueRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.noReturnValueRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.noReturnValueFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
     assertEquals(undefined, theResult);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testEmitSignal() {
@@ -345,18 +372,20 @@ function testEmitSignal() {
 
                                      proxy.disconnectSignal(id);
                                  });
-    proxy.emitSignalRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
-        if (excp)
-            log("Signal emission exception: " + excp);
+    proxy.emitSignalRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.emitSignalFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
 
     assertUndefined('result should be undefined', theResult);
-    assertNull('no exception set', theExcp);
+    assertUndefined('no exception set', theExcp);
     assertEquals('number of signals received', signalReceived, 1);
     assertEquals('signal argument', signalArgument, "foobar");
 
@@ -364,9 +393,13 @@ function testEmitSignal() {
 
 function testMultipleOutValues() {
     let theResult, theExcp;
-    proxy.multipleOutValuesRemote(function(result, excp) {
-        theResult = result;
-        theExcp = excp;
+    proxy.multipleOutValuesRemote(null, function(proxy, result) {
+        try {
+            theResult = proxy.multipleOutValuesFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
@@ -375,14 +408,18 @@ function testMultipleOutValues() {
     assertEquals("Hello", theResult[0]);
     assertEquals("World", theResult[1]);
     assertEquals("!", theResult[2]);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testOneArrayOut() {
     let theResult, theExcp;
-    proxy.oneArrayOutRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.oneArrayOutRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.oneArrayOutFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
@@ -391,14 +428,18 @@ function testOneArrayOut() {
     assertEquals("Hello", theResult[0]);
     assertEquals("World", theResult[1]);
     assertEquals("!", theResult[2]);
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testArrayOfArrayOut() {
     let theResult, theExcp;
-    proxy.arrayOfArrayOutRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.arrayOfArrayOutRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.arrayOfArrayOutFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
@@ -413,14 +454,18 @@ function testArrayOfArrayOut() {
     assertEquals("World", a2[0]);
     assertEquals("Hello", a2[1]);;
 
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 function testMultipleArrayOut() {
     let theResult, theExcp;
-    proxy.multipleArrayOutRemote(function(result, excp) {
-        theResult = result;
-        theExcp = excp;
+    proxy.multipleArrayOutRemote(null, function(proxy, result) {
+        try {
+            theResult = proxy.multipleArrayOutFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
@@ -435,7 +480,7 @@ function testMultipleArrayOut() {
     assertEquals("World", a2[0]);
     assertEquals("Hello", a2[1]);;
 
-    assertNull(theExcp);
+    assertUndefined(theExcp);
 }
 
 /* We are returning an array but the signature says it's an integer,
@@ -443,31 +488,38 @@ function testMultipleArrayOut() {
  */
 function testArrayOutBadSig() {
     let theResult, theExcp;
-    proxy.arrayOutBadSigRemote(function(result, excp) {
-        theResult = result;
-        theExcp = excp;
+    proxy.arrayOutBadSigRemote(null, function(proxy, result) {
+        try {
+            theResult = proxy.arrayOutBadSigFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
-    assertNull(theResult);
-    assertNotNull(theExcp);
+    assertUndefined(theResult);
+    assertNotUndefined(theExcp);
 }
 
 function testAsyncImplementation() {
     let someString = "Hello world!";
     let someInt = 42;
     let theResult, theExcp;
-    proxy.echoRemote(someString, someInt,
-                     function(result, excp) {
-                         theResult = result;
-                         theExcp = excp;
-                         Mainloop.quit('testGDBus');
-                     });
+    proxy.echoRemote(someString, someInt, null, function(proxy, result) {
+        try {
+            theResult = proxy.echoFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
+        Mainloop.quit('testGDBus');
+    });
 
     Mainloop.run('testGDBus');
-    assertNull(theExcp);
-    assertNotNull(theResult);
+    assertUndefined(theExcp);
+    assertNotUndefined(theResult);
     assertEquals(theResult[0], someString);
     assertEquals(theResult[1], someInt);
 }
@@ -476,31 +528,39 @@ function testBytes() {
     let someBytes = [ 0, 63, 234 ];
     let theResult, theExcp;
     for (let i = 0; i < someBytes.length; ++i) {
-        theResult = null;
-        theExcp = null;
-        proxy.byteEchoRemote(someBytes[i], function(result, excp) {
-            [theResult] = result;
-            theExcp = excp;
+        theResult = undefined;
+        theExcp = undefined;
+        proxy.byteEchoRemote(someBytes[i], null, function(proxy, result) {
+            try {
+                [theResult] = proxy.byteEchoFinish(result);
+            } catch(excp) {
+                theExcp = excp;
+            }
+
             Mainloop.quit('testGDBus');
         });
 
         Mainloop.run('testGDBus');
-        assertNull(theExcp);
-        assertNotNull(theResult);
+        assertUndefined(theExcp);
+        assertNotUndefined(theResult);
         assertEquals(someBytes[i], theResult);
     }
 }
 
 function testStructArray() {
     let theResult, theExcp;
-    proxy.structArrayRemote(function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.structArrayRemote(null, function(proxy, result) {
+        try {
+            [theResult] = proxy.structArrayFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
     Mainloop.run('testGDBus');
-    assertNull(theExcp);
-    assertNotNull(theResult);
+    assertUndefined(theExcp);
+    assertNotUndefined(theResult);
     assertEquals(theResult[0][0], 128);
     assertEquals(theResult[0][1], 123456);
     assertEquals(theResult[1][0], 42);
@@ -516,15 +576,19 @@ function testDictSignatures() {
         aDoubleBeforeAndAfter: GLib.Variant.new('d', 10.5),
     };
     let theResult, theExcp;
-    proxy.dictEchoRemote(someDict, function(result, excp) {
-        [theResult] = result;
-        theExcp = excp;
+    proxy.dictEchoRemote(someDict, null, function(proxy, result) {
+        try {
+            [theResult] = proxy.dictEchoFinish(result);
+        } catch(excp) {
+            theExcp = excp;
+        }
+
         Mainloop.quit('testGDBus');
     });
 
     Mainloop.run('testGDBus');
-    assertNull(theExcp);
-    assertNotNull(theResult);
+    assertUndefined(theExcp);
+    assertNotUndefined(theResult);
 
     // verify the fractional part was dropped off int
     assertEquals(11, theResult['anInteger'].deep_unpack());

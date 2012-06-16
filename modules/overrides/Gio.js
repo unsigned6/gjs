@@ -37,6 +37,48 @@ function _signatureLength(sig) {
     return counter;
 }
 
+function _gioStyleProxyFinish(result) {
+    return this.call_finish(result).deep_unpack();
+}
+
+function _gioStyleProxyInvoker(methodName, sync, inSignature, arg_array) {
+    var asyncCallback, cancellable;
+
+    /* Convert arg_array to a *real* array */
+    arg_array = Array.prototype.slice.call(arg_array);
+
+    var signatureLength = inSignature.length;
+    var numberArgs = sync ? signatureLength + 2 : signatureLength + 1;
+
+    if (arg_array.length < numberArgs) {
+        throw new Error("Wrong number of arguments passed for method: " + methodName +
+                       ". Expected " + numberArgs + ", got " + arg_array.length);
+    }
+
+    if (!sync)
+        asyncCallback = arg_array.pop();
+    cancellable = arg_array.pop();
+
+    var params = GLib.Variant.new('(' + inSignature.join('') + ')', arg_array);
+    if (!sync) {
+        this.call(methodName,
+                  params,
+                  Gio.DBusCallFlags.NONE,
+                  -1,
+                  cancellable,
+                  asyncCallback);
+
+        // silent a warning
+        return undefined;
+    } else {
+        return this.call_sync(methodName,
+                              params,
+                              Gio.DBusCallFlags.NONE,
+                              -1,
+                              cancellable).deep_unpack();
+    }
+}
+
 function _proxyInvoker(methodName, sync, inSignature, arg_array) {
     var replyFunc;
     var flags = 0;
@@ -207,30 +249,7 @@ const DBusProxyClass = new Lang.Class({
             params.g_interface_name = this.Interface.name;
             params.g_interface_info = this.Interface;
 
-            let asyncCallback, cancellable = null;
-            if ('g_async_callback' in params) {
-                asyncCallback = params.g_async_callback;
-                delete params.g_async_callback;
-            }
-            if ('g_cancellable' in params) {
-                cancellable = params.g_cancellable;
-                delete params.g_cancellable;
-            }
-
             this.parent(params);
-
-            if (asyncCallback) {
-                this.init_async(GLib.PRIORITY_DEFAULT, cancellable, function(initable, result) {
-                    try {
-                        initable.init_finish(result);
-                        asyncCallback(initable, null);
-                    } catch(e) {
-                        asyncCallback(null, e);
-                    }
-                });
-            } else {
-                this.init(cancellable);
-            }
 
             this.connect('g-signal', _convertToNativeSignal);
         }
@@ -242,14 +261,27 @@ const DBusProxyClass = new Lang.Class({
         this._addDBusConvenience(classParams);
     },
 
+    _makeGioStyleProxyMethod: function(method, sync) {
+        var name = method.name;
+        var inArgs = method.in_args;
+        var inSignature = [ ];
+        for (var i = 0; i < inArgs.length; i++)
+            inSignature.push(inArgs[i].signature);
+
+        return this.wrapFunction(method, function() {
+            return _gioStyleProxyInvoker.call(this, name, sync, inSignature, arguments);
+        });
+    },
+
     _addDBusConvenience: function(classParams) {
         let info = classParams.Interface;
 
         let i, methods = info.methods;
         for (i = 0; i < methods.length; i++) {
             var method = methods[i];
-            this.prototype[method.name + 'Remote'] = _makeProxyMethod.call(this, methods[i], false, true);
-            this.prototype[method.name + 'Sync'] = _makeProxyMethod.call(this, methods[i], true, true);
+            this.prototype[method.name + 'Remote'] = this._makeGioStyleProxyMethod(methods[i], false);
+            this.prototype[method.name + 'Finish'] = this.wrapFunction(method.name + 'Finish', _gioStyleProxyFinish);
+            this.prototype[method.name + 'Sync'] = this._makeGioStyleProxyMethod(methods[i], true);
         }
 
         let properties = info.properties;
