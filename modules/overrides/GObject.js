@@ -126,7 +126,6 @@ const GObjectMeta = new Lang.Class({
         // See Class.prototype._construct in lang.js for the reasoning
         // behind this direct __proto__ set.
         newClass.__proto__ = this.constructor.prototype;
-        newClass.__super__ = parent;
 
         newClass._init.apply(newClass, arguments);
 
@@ -247,6 +246,8 @@ function _init() {
         this._init.apply(this, arguments);
         return this;
     };
+
+    this.Object.prototype.parent = Lang._parent;
 
     // fake enum for signal accumulators, keep in sync with gi/object.c
     this.AccumulatorType = {

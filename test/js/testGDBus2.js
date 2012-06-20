@@ -208,6 +208,18 @@ const TestProxy = new Lang.Class({
     Interface: TestIface,
 });
 
+const TestSlimProxy = new Lang.Class({
+    Name: 'TestSlimProxy',
+    Extends: Gio.DBusProxy,
+    Interface: TestIface,
+
+    _init: function() {
+	this.parent({ g_bus_type: Gio.BusType.SESSION,
+		      g_name: 'org.gnome.gjs.Test',
+		      g_object_path: '/org/gnome/gjs/Test' });
+    },
+});
+
 var proxy, exporter;
 
 function testExportStuff() {
@@ -234,6 +246,26 @@ function testInitStuff() {
                             g_name: 'org.gnome.gjs.Test',
                             g_object_path: '/org/gnome/gjs/Test'
                           });
+    proxy.init_async(GLib.PRIORITY_DEFAULT, null, function (obj, result) {
+        try {
+            obj.init_finish(result);
+        } catch(error) {
+            theError = error;
+            proxy = obj;
+        }
+
+        Mainloop.quit('testGDBus');
+    });
+
+    Mainloop.run('testGDBus');
+
+    assertUndefined(theError);
+    assertNotUndefined(proxy);
+}
+
+function testInitSlimStuff() {
+    var theError;
+    proxy = new TestSlimProxy();
     proxy.init_async(GLib.PRIORITY_DEFAULT, null, function (obj, result) {
         try {
             obj.init_finish(result);
@@ -386,8 +418,8 @@ function testEmitSignal() {
 
     assertUndefined('result should be undefined', theResult);
     assertUndefined('no exception set', theExcp);
-    assertEquals('number of signals received', signalReceived, 1);
-    assertEquals('signal argument', signalArgument, "foobar");
+    assertEquals('number of signals received', 1, signalReceived);
+    assertEquals('signal argument', 'foobar', signalArgument);
 
 }
 

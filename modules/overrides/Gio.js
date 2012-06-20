@@ -1,4 +1,4 @@
-// application/javascript;version=1.8
+// -*- mode: js; indent-tabs-mode: nil -*-
 // Copyright 2011 Giovanni Campagna
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,7 +24,7 @@ var GObject = imports.gi.GObject;
 var GjsPrivate = imports.gi.GjsPrivate;
 var Lang = imports.lang;
 var Signals = imports.signals;
-var Gio;
+var Gio = imports.gi.Gio;
 
 function _signatureLength(sig) {
     var counter = 0;
@@ -197,10 +197,17 @@ function _propertySetter(value, name, signature) {
               }));
 }
 
-function _addDBusConvenience() {
-    // Check if this is actually using new-style bindings
-    if (this.constructor instanceof DBusProxyClass)
-        return;
+function _proxyInitOverride(params) {
+    // Extend params with Interface and Interface.name
+    if (!params)
+        params = { };
+    if (!params.g_interface_name) {
+        params.g_interface_name = this.Interface.name;
+        params.g_interface_info = this.Interface;
+    }
+
+    // Build the actual object
+    this.parent(params);
 
     let info = this.g_interface_info;
     if (!info)
@@ -208,6 +215,11 @@ function _addDBusConvenience() {
 
     if (info.signals.length > 0)
         this.connect('g-signal', _convertToNativeSignal);
+
+    // Check if this is using new-style bindings (and thus
+    // invokers and property accessors are already installed)
+    if (this.constructor instanceof DBusProxyClass)
+        return;
 
     let i, methods = info.methods;
     for (i = 0; i < methods.length; i++) {
@@ -231,7 +243,12 @@ const DBusProxyClass = new Lang.Class({
     Extends: GObject.Class,
 
     _construct: function(params) {
-        params.Extends = Gio.DBusProxy;
+        if (!params.Extends)
+            params.Extends = Gio.DBusProxy;
+
+        if (!(params.Extends == Gio.DBusProxy ||
+              params.Extends.prototype instanceof Gio.DBusProxy))
+            throw new TypeError('Gio.DBusProxyClass used with invalid base class ' + params.Extends);
 
         return this.parent(params);
     },
@@ -241,18 +258,6 @@ const DBusProxyClass = new Lang.Class({
             throw new TypeError('Interface must be specified in the declaration of a DBusProxyClass');
         if (!(classParams.Interface instanceof Gio.DBusInterfaceInfo))
             classParams.Interface = _newInterfaceInfo(classParams.Interface);
-
-        classParams._init = function(params) {
-            let klass = this.constructor;
-            if (!params)
-                params = { };
-            params.g_interface_name = this.Interface.name;
-            params.g_interface_info = this.Interface;
-
-            this.parent(params);
-
-            this.connect('g-signal', _convertToNativeSignal);
-        }
 
         // build the actual class
         this.parent(classParams);
@@ -571,8 +576,6 @@ function _wrapJSObject(interfaceInfo, jsObj) {
 }
 
 function _init() {
-    Gio = this;
-
     Gio.DBus = {
         get session() {
             return Gio.bus_get_sync(Gio.BusType.SESSION, null);
@@ -608,8 +611,7 @@ function _init() {
         return Gio.bus_unown_name(id);
     };
 
-    _injectToMethod(Gio.DBusProxy.prototype, 'init', _addDBusConvenience);
-    _injectToMethod(Gio.DBusProxy.prototype, 'init_async', _addDBusConvenience);
+    Gio.DBusProxy.prototype._init = Lang.Class.prototype.wrapFunction.call(Gio.DBusProxy, '_init', _proxyInitOverride);
 
     Gio.DBusProxyClass = DBusProxyClass;
     Gio.DBusProxy.prototype.__metaclass__ = DBusProxyClass;

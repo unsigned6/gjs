@@ -139,16 +139,26 @@ function _Base() {
     throw new TypeError('Cannot instantiate abstract class _Base');
 }
 
-_Base.__super__ = null;
 _Base.prototype._init = function() { };
 _Base.prototype._construct = function() {
     this._init.apply(this, arguments);
     return this;
 };
 _Base.prototype.__name__ = '_Base';
+_Base.prototype.parent = _parent;
 _Base.prototype.toString = function() {
     return '[object ' + this.__name__ + ']';
 };
+
+function getSuperClass(klass) {
+    let proto = klass.prototype;
+    let parentProto = Object.getPrototypeOf(proto);
+
+    if (parentProto)
+        return parentProto.constructor;
+    else
+        return undefined;
+}
 
 function _parent() {
     if (!this.__caller__)
@@ -156,10 +166,9 @@ function _parent() {
 
     let caller = this.__caller__;
     let name = caller._name;
-    let parent = caller._owner.__super__;
+    let parent = getSuperClass(caller._owner);
 
     let previous = parent ? parent.prototype[name] : undefined;
-
     if (!previous)
         throw new TypeError("The method '" + name + "' is not on the superclass");
 
@@ -190,7 +199,6 @@ function Class(params) {
     }
 }
 
-Class.__super__ = _Base;
 Class.prototype = Object.create(_Base.prototype);
 Class.prototype.constructor = Class;
 Class.prototype.__name__ = 'Class';
@@ -246,7 +254,6 @@ Class.prototype._construct = function(params) {
     // methods/properties of Class.prototype, like wrapFunction.
     newClass.__proto__ = this.constructor.prototype;
 
-    newClass.__super__ = parent;
     newClass.prototype = Object.create(parent.prototype);
     newClass.prototype.constructor = newClass;
 
@@ -288,10 +295,7 @@ Class.prototype._init = function(params) {
                       configurable: false,
                       enumerable: false,
                       value: name },
-        'parent': { writable: false,
-                    configurable: false,
-                    enumerable: false,
-                    value: _parent }});
+    });
 };
 
 // Merge stuff defined in native code
