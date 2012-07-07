@@ -369,10 +369,11 @@ find_vfunc_on_parent(GIObjectInfo *info,
     while (!vfunc && parent) {
         old_parent = parent;
         parent = g_object_info_get_parent(old_parent);
+        g_base_info_unref(old_parent);
+
         if (!parent)
             break;
 
-        g_base_info_unref(old_parent);
         vfunc = g_object_info_find_vfunc(parent, name);
     }
 
@@ -2409,6 +2410,7 @@ gjs_register_property(JSContext *cx,
 
     priv = priv_from_js(cx, obj);
     pspec = gjs_g_param_from_param(cx, pspec_js);
+    g_param_spec_ref(pspec);
 
     g_param_spec_set_qdata(pspec, gjs_is_custom_property_quark(), GINT_TO_POINTER(1));
 
