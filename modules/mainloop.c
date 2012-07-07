@@ -134,8 +134,9 @@ closure_source_func(void *data)
     JS_AddValueRoot(context, &retval);
 
     gjs_closure_invoke(closure,
-                          0, NULL,
-                          &retval);
+                       NULL,
+                       0, NULL,
+                       &retval);
 
     /* ValueToBoolean pretty much always succeeds, just as
      * JavaScript always makes some sense of any value in

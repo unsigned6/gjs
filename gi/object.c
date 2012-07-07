@@ -53,8 +53,9 @@ typedef struct {
     JSObject *keep_alive; /* NULL if we are not added to it */
     GType gtype;
 
-    /* a list of all signal connections, used when tracing */
-    GList *signals;
+    /* a list of all GClosures installed on this object (from
+       signals, trampolines and explicit GClosures), used when tracing */
+    GList *closures;
 
     /* the GObjectClass wrapped by this JS Object (only used for
        prototypes) */
@@ -66,6 +67,8 @@ typedef struct {
     GList *link;
     GClosure *closure;
 } ConnectData;
+
+typedef void (*GClosureFunc) (GClosure*, gpointer);
 
 enum {
     PROP_0,
@@ -106,6 +109,16 @@ gjs_is_custom_type_quark (void)
     static GQuark val = 0;
     if (!val)
         val = g_quark_from_static_string ("gjs::custom-type");
+
+    return val;
+}
+
+static GQuark
+gjs_object_priv_quark (void)
+{
+    static GQuark val = 0;
+    if (!val)
+        val = g_quark_from_static_string ("gjs::class-private");
 
     return val;
 }
@@ -1044,20 +1057,28 @@ GJS_NATIVE_CONSTRUCTOR_DECLARE(object_instance)
 }
 
 static void
-invalidate_all_signals(ObjectInstance *priv)
+closures_foreach(ObjectInstance  *priv,
+                 GClosureFunc     func,
+                 gpointer         user_data)
 {
     GList *iter, *next;
 
-    for (iter = priv->signals; iter; ) {
+    for (iter = priv->closures; iter; ) {
         ConnectData *cd = iter->data;
         next = iter->next;
 
-        /* This will also free cd and iter, through
-           the closure invalidation mechanism */
-        g_closure_invalidate(cd->closure);
+        /* This could also free cd and iter, for
+           example when func is g_closure_invalidate */
+        func(cd->closure, user_data);
 
         iter = next;
     }
+}    
+
+static void
+invalidate_all_closures(ObjectInstance *priv)
+{
+    closures_foreach(priv, (GClosureFunc) g_closure_invalidate, NULL);
 }
 
 static void
@@ -1065,15 +1086,9 @@ object_instance_trace(JSTracer *tracer,
                       JSObject *obj)
 {
     ObjectInstance *priv;
-    GList *iter;
 
     priv = priv_from_js(tracer->context, obj);
-
-    for (iter = priv->signals; iter; iter = iter->next) {
-        ConnectData *cd = iter->data;
-
-        gjs_closure_trace(cd->closure, tracer);
-    }
+    closures_foreach(priv, (GClosureFunc) gjs_closure_trace, tracer);
 }
 
 static void
@@ -1097,7 +1112,7 @@ object_instance_finalize(JSContext *context,
                                     priv->info ? g_base_info_get_name((GIBaseInfo*) priv->info) : g_type_name(priv->gtype)));
 
     if (priv->gobj) {
-        invalidate_all_signals (priv);
+        invalidate_all_closures (priv);
 
         if (G_UNLIKELY (priv->gobj->ref_count <= 0)) {
             g_error("Finalizing proxy for an already freed object of type: %s.%s\n",
@@ -1158,14 +1173,45 @@ gjs_lookup_object_prototype(JSContext    *context,
 }
 
 static void
-signal_connection_invalidated (gpointer  user_data,
+closure_invalidated (gpointer  user_data,
                                GClosure *closure)
 {
     ConnectData *connect_data = user_data;
 
-    connect_data->obj->signals = g_list_delete_link(connect_data->obj->signals,
-                                                    connect_data->link);
+    connect_data->obj->closures = g_list_delete_link(connect_data->obj->closures,
+                                                     connect_data->link);
     g_slice_free(ConnectData, connect_data);
+}
+
+static void
+do_associate_closure (ObjectInstance *priv,
+                      GClosure       *closure)
+{
+    ConnectData *connect_data;
+
+    connect_data = g_slice_new(ConnectData);
+    priv->closures = g_list_prepend(priv->closures, connect_data);
+    connect_data->obj = priv;
+    connect_data->link = priv->closures;
+    /* This is a weak reference, and will be cleared when the closure is invalidated */
+    connect_data->closure = closure;
+    g_closure_add_invalidate_notifier(closure, connect_data, closure_invalidated);
+}
+
+JSBool
+gjs_object_associate_closure (JSContext *context,
+                              JSObject  *object,
+                              GClosure  *closure)
+{
+    ObjectInstance *priv;
+
+    priv = priv_from_js(context, object);
+    if (priv == NULL)
+        return JS_FALSE;
+
+    do_associate_closure(priv, closure);
+
+    return JS_TRUE;
 }
 
 static JSBool
@@ -1183,7 +1229,6 @@ real_connect_func(JSContext *context,
     char *signal_name;
     GQuark signal_detail;
     jsval retval;
-    ConnectData *connect_data;
     JSBool ret = JS_FALSE;
 
     if (!do_base_typecheck(context, obj, JS_TRUE))
@@ -1236,13 +1281,7 @@ real_connect_func(JSContext *context,
     if (closure == NULL)
         goto out;
 
-    connect_data = g_slice_new(ConnectData);
-    priv->signals = g_list_prepend(priv->signals, connect_data);
-    connect_data->obj = priv;
-    connect_data->link = priv->signals;
-    /* This is a weak reference, and will be cleared when the closure is invalidated */
-    connect_data->closure = closure;
-    g_closure_add_invalidate_notifier(closure, connect_data, signal_connection_invalidated);
+    do_associate_closure(priv, closure);
 
     id = g_signal_connect_closure(priv->gobj,
                                   signal_name,
@@ -2156,7 +2195,7 @@ gjs_hook_up_vfunc(JSContext *cx,
         method_ptr = G_STRUCT_MEMBER_P(implementor_vtable, offset);
 
         trampoline = gjs_callback_trampoline_new(cx, OBJECT_TO_JSVAL(function), callback_info,
-                                                 GI_SCOPE_TYPE_NOTIFIED, TRUE);
+                                                 GI_SCOPE_TYPE_NOTIFIED, object, TRUE);
 
         *((ffi_closure **)method_ptr) = trampoline->closure;
 
@@ -2269,6 +2308,30 @@ gjs_object_class_init(GObjectClass *class,
                                                            G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 }
 
+static void
+gjs_object_base_init(GObjectClass *klass,
+                     gpointer      user_data)
+{
+    ObjectInstance *priv;
+
+    priv = g_type_get_qdata (G_OBJECT_CLASS_TYPE(klass), gjs_object_priv_quark());
+
+    if (priv)
+        closures_foreach(priv, (GClosureFunc) g_closure_ref, NULL);
+}
+
+static void
+gjs_object_base_finalize(GObjectClass *klass,
+                         gpointer      user_data)
+{
+    ObjectInstance *priv;
+
+    priv = g_type_get_qdata (G_OBJECT_CLASS_TYPE(klass), gjs_object_priv_quark());
+
+    if (priv)
+        closures_foreach(priv, (GClosureFunc) g_closure_unref, NULL);
+}
+
 static JSBool
 gjs_register_type(JSContext *cx,
                   uintN      argc,
@@ -2276,16 +2339,16 @@ gjs_register_type(JSContext *cx,
 {
     jsval *argv = JS_ARGV(cx, vp);
     gchar *name;
-    JSObject *parent, *constructor;
+    JSObject *parent, *constructor, *prototype;
     GType instance_type, parent_type;
     GTypeQuery query;
     GTypeModule *type_module;
-    ObjectInstance *parent_priv;
+    ObjectInstance *parent_priv, *priv;
     GTypeInfo type_info = {
         0, /* class_size */
 
-	(GBaseInitFunc) NULL,
-	(GBaseFinalizeFunc) NULL,
+	(GBaseInitFunc) gjs_object_base_init,
+	(GBaseFinalizeFunc) gjs_object_base_finalize,
 
 	(GClassInitFunc) gjs_object_class_init,
 	(GClassFinalizeFunc) NULL,
@@ -2337,14 +2400,16 @@ gjs_register_type(JSContext *cx,
                                                 name,
                                                 &type_info,
                                                 0);
-
     g_free(name);
 
     g_type_set_qdata (instance_type, gjs_is_custom_type_quark(), GINT_TO_POINTER (1));
 
     /* create a custom JSClass */
-    if (!gjs_define_object_class(cx, NULL, instance_type, &constructor, NULL))
+    if (!gjs_define_object_class(cx, NULL, instance_type, &constructor, &prototype))
         return JS_FALSE;
+
+    priv = priv_from_js(cx, prototype);
+    g_type_set_qdata (instance_type, gjs_object_priv_quark(), priv);
 
     JS_SET_RVAL(cx, vp, OBJECT_TO_JSVAL(constructor));
 

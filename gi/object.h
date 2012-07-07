@@ -24,7 +24,7 @@
 #ifndef __GJS_OBJECT_H__
 #define __GJS_OBJECT_H__
 
-#include <glib.h>
+#include <glib-object.h>
 
 #include <jsapi.h>
 
@@ -47,6 +47,9 @@ JSBool    gjs_typecheck_object          (JSContext     *context,
                                          JSObject      *obj,
                                          GType          expected_type,
                                          JSBool         throw);
+JSBool    gjs_object_associate_closure  (JSContext     *context,
+                                         JSObject      *obj,
+                                         GClosure      *closure);
 
 G_END_DECLS
 

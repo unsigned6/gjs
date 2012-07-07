@@ -348,7 +348,7 @@ pending_notify(DBusPendingCall *pending,
     }
 
     gjs_js_push_current_message(reply);
-    gjs_closure_invoke(closure, 2, &argv[0], &discard);
+    gjs_closure_invoke(closure, NULL, 2, &argv[0], &discard);
     gjs_js_pop_current_message();
 
     if (reply)
@@ -681,6 +681,7 @@ signal_handler_callback(DBusConnection *connection,
 
     gjs_js_push_current_message(message);
     gjs_closure_invoke(handler->closure,
+                       NULL,
                        gjs_rooted_array_get_length(context, arguments),
                        gjs_rooted_array_get_data(context, arguments),
                        &ret_val);
@@ -1079,7 +1080,7 @@ on_name_acquired(DBusConnection *connection,
     JS_AddValueRoot(context, &rval);
 
     gjs_closure_invoke(owner->acquired_closure,
-                       argc, argv, &rval);
+                       NULL, argc, argv, &rval);
 
     JS_RemoveValueRoot(context, &argv[0]);
     JS_RemoveValueRoot(context, &rval);
@@ -1118,7 +1119,7 @@ on_name_lost(DBusConnection *connection,
     JS_AddValueRoot(context, &rval);
 
     gjs_closure_invoke(owner->lost_closure,
-                          argc, argv, &rval);
+                       NULL, argc, argv, &rval);
 
     JS_RemoveValueRoot(context, &argv[0]);
     JS_RemoveValueRoot(context, &rval);
@@ -1311,7 +1312,7 @@ on_name_appeared(DBusConnection *connection,
     JS_AddValueRoot(context, &rval);
 
     gjs_closure_invoke(watcher->appeared_closure,
-                          argc, argv, &rval);
+                       NULL, argc, argv, &rval);
 
     JS_RemoveValueRoot(context, &rval);
     gjs_unroot_value_locations(context, argv, argc);
@@ -1354,7 +1355,7 @@ on_name_vanished(DBusConnection *connection,
     JS_AddValueRoot(context, &rval);
 
     gjs_closure_invoke(watcher->vanished_closure,
-                          argc, argv, &rval);
+                       NULL, argc, argv, &rval);
 
     JS_RemoveValueRoot(context, &rval);
     gjs_unroot_value_locations(context, argv, argc);
