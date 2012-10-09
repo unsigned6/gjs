@@ -53,6 +53,8 @@ typedef struct {
 
     JSContext *default_context;
 
+    int string_finalizer_id;
+
     /* In a thread-safe future we'd keep this in per-thread data */
     ContextFrame current_frame;
     GSList *context_stack;

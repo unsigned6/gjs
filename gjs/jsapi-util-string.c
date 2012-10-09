@@ -28,6 +28,42 @@
 #include "jsapi-util.h"
 #include "compat.h"
 
+static const char *
+gjs_string_get_bytes(JSContext   *context,
+                     jsval        value,
+                     gsize       *len_p)
+{
+    JSString *str;
+    GByteArray *array;
+
+    if (!JSVAL_IS_STRING(value)) {
+        gjs_throw(context,
+                  "Value is not a string, can't return binary data from it");
+        return NULL;
+    }
+
+    str = JSVAL_TO_STRING(value);
+
+    if (!JS_IsExternalString(context, str)) {
+        gjs_throw(context,
+                  "Value is not a GJS string, can't return binary data from it");
+        return NULL;
+    }
+
+    array = JS_GetExternalStringClosure(context, str);
+
+    if (array == NULL) {
+        gjs_throw(context,
+                  "Value is not a valid GJS string, can't return binary data from it");
+        return NULL;
+    }
+
+    if (len_p)
+        *len_p = array->len;
+
+    return (const char *) array->data;
+}
+
 gboolean
 gjs_try_string_to_utf8 (JSContext  *context,
                         const jsval string_val,
@@ -39,15 +75,25 @@ gjs_try_string_to_utf8 (JSContext  *context,
     char *utf8_string;
     long read_items;
     long utf8_length;
+    const char *bytes;
+    gsize len;
     GError *convert_error = NULL;
 
     JS_BeginRequest(context);
 
-    if (!JSVAL_IS_STRING(string_val)) {
-        g_set_error_literal(error, GJS_UTIL_ERROR, GJS_UTIL_ERROR_ARGUMENT_TYPE_MISMATCH,
-                            "Object is not a string, cannot convert to UTF-8");
+    bytes = gjs_string_get_bytes(context, string_val, &len);
+
+    if (bytes) {
         JS_EndRequest(context);
-        return FALSE;
+
+        if (!g_utf8_validate (bytes, len, NULL)) {
+            g_set_error_literal(error, GJS_UTIL_ERROR, GJS_UTIL_ERROR_ARGUMENT_INVALID,
+                                "JS string contains invalid Unicode characters");
+            return JS_FALSE;
+        }
+
+        *utf8_string_p = g_memdup (bytes, len);
+        return JS_TRUE;
     }
 
     s = JS_GetStringCharsAndLength(context, JSVAL_TO_STRING(string_val), &s_length);
@@ -262,18 +308,22 @@ gjs_string_get_ascii(JSContext       *context,
     return ascii;
 }
 
-static JSBool
-throw_if_binary_strings_broken(JSContext *context)
+void
+gjs_string_free (JSContext *context,
+                 JSString  *string)
 {
-    /* JS_GetStringBytes() returns low byte of each jschar,
-     * unless JS_CStringsAreUTF8() in which case we're screwed.
-     */
-    if (JS_CStringsAreUTF8()) {
-        gjs_throw(context, "If JS_CStringsAreUTF8(), gjs doesn't know how to do binary strings");
-        return JS_TRUE;
-    }
+    GByteArray   *array;
+    const jschar *description;
+    size_t        len;
 
-    return JS_FALSE;
+    description = JS_GetStringCharsAndLength(context, string, &len);
+    g_free((gpointer) description);
+
+    array = JS_GetExternalStringClosure(context, string);
+
+    if (array != NULL) {
+        g_byte_array_unref (array);
+    }
 }
 
 /**
@@ -296,9 +346,23 @@ gjs_string_get_binary_data(JSContext       *context,
 {
     JSString *str;
     gsize len;
+    const char *raw_bytes;
     char *bytes;
 
     JS_BeginRequest(context);
+
+    raw_bytes = gjs_string_get_bytes(context, value, &len);
+
+    if (raw_bytes) {
+        if (data_p)
+            *data_p = g_memdup(raw_bytes, len);
+
+        if (len_p)
+            *len_p = len;
+        JS_EndRequest(context);
+
+        return JS_TRUE;
+    }
 
     if (!JSVAL_IS_STRING(value)) {
         gjs_throw(context,
@@ -307,16 +371,13 @@ gjs_string_get_binary_data(JSContext       *context,
         return JS_FALSE;
     }
 
-    if (throw_if_binary_strings_broken(context)) {
-        JS_EndRequest(context);
-        return JS_FALSE;
-    }
-
     str = JSVAL_TO_STRING(value);
 
     len = JS_GetStringEncodingLength(context, str);
-    if (len == (gsize)(-1))
+    if (len == (gsize)(-1)) {
+        JS_EndRequest(context);
         return JS_FALSE;
+    }
 
     if (data_p) {
         bytes = g_malloc((len + 1) * sizeof(char));
@@ -331,6 +392,85 @@ gjs_string_get_binary_data(JSContext       *context,
     JS_EndRequest(context);
 
     return JS_TRUE;
+}
+
+static void
+gjs_string_escape (JSContext   *context,
+                   const char  *data,
+                   gsize        len,
+                   const char  *prefix,
+                   const char  *suffix,
+                   char       **escaped_data_p,
+                   gsize       *escaped_len_p)
+{
+    gsize i, escaped_len, prefix_len, suffix_len;
+    char *escaped_data;
+
+    prefix_len = strlen(prefix);
+    suffix_len = strlen(suffix);
+
+    escaped_len = prefix_len + 3 * len + suffix_len + 1;
+    escaped_data = g_malloc(escaped_len);
+
+    strcpy(escaped_data, prefix);
+    for (i = 0; i < len; i++) {
+        g_snprintf(escaped_data + prefix_len + 3 * i, 4, "\\%02hhx", data[i]);
+    }
+    escaped_data[3 * len] = '\0';
+    strcpy(escaped_data + escaped_len - suffix_len, suffix);
+
+    *escaped_data_p = escaped_data;
+    *escaped_len_p = escaped_len;
+}
+
+static jschar *
+gjs_string_get_chars_description (JSContext  *context,
+                                  const char *data,
+                                  gsize       len,
+                                  gsize      *description_len)
+{
+    char *escaped_data;
+    gsize escaped_len;
+    jschar *u16_string;
+    glong u16_string_length;
+    GError *error;
+
+    if (len > 20) {
+        gjs_string_escape(context,
+                          data,
+                          20,
+                          "[binary data: ",
+                          "...]",
+                          &escaped_data,
+                          &escaped_len);
+     } else {
+        gjs_string_escape(context,
+                          data,
+                          len,
+                          "",
+                          "",
+                          &escaped_data,
+                          &escaped_len);
+     }
+
+    error = NULL;
+    u16_string = g_utf8_to_utf16(escaped_data,
+                                 escaped_len,
+                                 NULL,
+                                 &u16_string_length,
+                                 &error);
+    g_free (escaped_data);
+
+    if (!u16_string) {
+        gjs_throw(context,
+                     "Failed to convert UTF-8 string to "
+                     "JS string: %s",
+                     error->message);
+        g_error_free(error);
+        return NULL;
+    }
+
+    return (jschar *) u16_string;
 }
 
 /**
@@ -351,19 +491,26 @@ gjs_string_from_binary_data(JSContext       *context,
                             jsval           *value_p)
 {
     JSString *s;
+    GByteArray *array;
+    jschar *description;
+    gsize   description_len;
 
     JS_BeginRequest(context);
 
-    if (throw_if_binary_strings_broken(context)) {
+    description = gjs_string_get_chars_description (context, data, len, &description_len);
+
+    if (!description) {
         JS_EndRequest(context);
         return JS_FALSE;
     }
 
-    /* store each byte in a 16-bit jschar so all high bytes are 0;
-     * we can't put two bytes per jschar because then we'd lose
-     * track of the string length if it was an odd number.
-     */
-    s = JS_NewStringCopyN(context, data, len);
+    array = g_byte_array_new_take(g_memdup(data, len), len);
+
+    s = JS_NewExternalStringWithClosure(context,
+                                        description,
+                                        description_len,
+                                        gjs_context_get_string_finalizer_id(context),
+                                        array);
     if (s == NULL) {
         /* gjs_throw() does nothing if exception already set */
         gjs_throw(context, "Failed to allocate binary string");
@@ -395,27 +542,52 @@ gjs_string_get_uint16_data(JSContext       *context,
                            guint16        **data_p,
                            gsize           *len_p)
 {
-    const jschar *js_data;
-    JSBool retval = JS_FALSE;
+    JSString *str;
+    GByteArray *array;
 
     JS_BeginRequest(context);
 
     if (!JSVAL_IS_STRING(value)) {
         gjs_throw(context,
                   "Value is not a string, can't return binary data from it");
-        goto out;
+        JS_EndRequest(context);
+        return JS_FALSE;
     }
 
-    js_data = JS_GetStringCharsAndLength(context, JSVAL_TO_STRING(value), len_p);
-    if (js_data == NULL)
-        goto out;
+    str = JSVAL_TO_STRING(value);
 
-    *data_p = g_memdup(js_data, sizeof(*js_data)*(*len_p));
+    if (!JS_IsExternalString(context, str)) {
+        gjs_throw(context,
+                  "Value is not a GJS string, can't return binary data from it");
+        JS_EndRequest(context);
+        return JS_FALSE;
+    }
 
-    retval = JS_TRUE;
-out:
+    array = JS_GetExternalStringClosure(context, str);
+
+    if (array == NULL) {
+        gjs_throw(context,
+                  "Value is not a valid GJS string, can't return binary data from it");
+        JS_EndRequest(context);
+        return JS_FALSE;
+    }
+
+    if (data_p) {
+        gsize i;
+
+        *data_p = g_malloc0(array->len * sizeof (guint16));
+
+        for (i = 0; i < array->len; i++) {
+            data_p[i] = (guint16) array->data[i];
+        }
+    }
+
+    if (len_p)
+        *len_p = array->len;
+
     JS_EndRequest(context);
-    return retval;
+
+    return JS_TRUE;
 }
 
 /**

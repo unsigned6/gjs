@@ -402,6 +402,8 @@ gboolean    gjs_try_string_to_utf8            (JSContext       *context,
                                                const            jsval string_val,
                                                char           **utf8_string_p,
                                                GError         **error);
+void        gjs_string_free                   (JSContext       *context,
+                                               JSString        *string);
 
 void gjs_maybe_gc (JSContext *context);
 

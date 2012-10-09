@@ -35,6 +35,12 @@
 
 G_BEGIN_DECLS
 
+/* called from jsapi-util-string.c (defined in context.c) to get the custom
+ * finalizer id for allocating strings containing binary data
+ */
+int gjs_context_get_string_finalizer_id (JSContext *context);
+
+
 G_END_DECLS
 
 #endif  /* __GJS_JSAPI_PRIVATE_H__ */

@@ -40,6 +40,7 @@
 #include <string.h>
 
 #include <jsapi.h>
+#include "jsapi-private.h"
 
 #define _GJS_JS_VERSION_DEFAULT "1.8"
 
@@ -73,6 +74,7 @@ struct _GjsContext {
     char **search_path;
 
     guint idle_emit_gc_id;
+    int   string_finalizer_id;
 
     guint we_own_runtime : 1;
     guint gc_notifications_enabled : 1;
@@ -361,6 +363,29 @@ gjs_context_class_init(GjsContextClass *klass)
 }
 
 static void
+gjs_context_register_string_finalizer(GjsContext *js_context)
+{
+    js_context->string_finalizer_id = JS_AddExternalStringFinalizer(gjs_string_free);
+}
+
+static void
+gjs_context_unregister_string_finalizer (GjsContext *js_context)
+{
+    if (js_context->string_finalizer_id < 0) {
+        js_context->string_finalizer_id = JS_RemoveExternalStringFinalizer(gjs_string_free);
+        js_context->string_finalizer_id = -1;
+    }
+}
+
+int
+gjs_context_get_string_finalizer_id (JSContext *context)
+{
+    GjsContext *js_context = JS_GetContextPrivate(context);
+
+    return js_context->string_finalizer_id;
+}
+
+static void
 gjs_context_dispose(GObject *object)
 {
     GjsContext *js_context;
@@ -371,6 +396,8 @@ gjs_context_dispose(GObject *object)
         gjs_profiler_free(js_context->profiler);
         js_context->profiler = NULL;
     }
+
+    gjs_context_unregister_string_finalizer (js_context);
 
     if (js_context->global != NULL) {
         js_context->global = NULL;
@@ -701,6 +728,10 @@ gjs_context_constructor (GType                  type,
 
     if (js_context->gc_notifications_enabled)
         JS_SetGCCallback(js_context->context, gjs_on_context_gc);
+
+    /* Register a string finalizer for binary data
+     */
+    gjs_context_register_string_finalizer (js_context);
 
     JS_EndRequest(js_context->context);
 
