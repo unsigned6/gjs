@@ -125,10 +125,6 @@ gjs_string_from_utf8(JSContext  *context,
     JSString *s;
     GError *error;
 
-    /* intentionally using n_bytes even though glib api suggests n_chars; with
-     * n_chars (from g_utf8_strlen()) the result appears truncated
-     */
-
     error = NULL;
     u16_string = g_utf8_to_utf16(utf8_string,
                                  n_bytes,
