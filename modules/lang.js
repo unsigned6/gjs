@@ -287,7 +287,7 @@ Class.prototype._init = function(params) {
         descriptor.configurable = false;
 
         propertyObj[name] = descriptor;
-    }.bind(this));
+    }, this);
 
     Object.defineProperties(this.prototype, propertyObj);
     Object.defineProperties(this.prototype, {
