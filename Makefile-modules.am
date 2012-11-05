@@ -18,7 +18,7 @@ dist_gjsjs_DATA +=		\
 	modules/promise.js	\
 	modules/format.js
 
-gjsnative_LTLIBRARIES += console.la debugger.la langNative.la mainloop.la gettextNative.la dbusNative.la cairoNative.la system.la formatNative.la
+gjsnative_LTLIBRARIES += console.la debugger.la gjson.la langNative.la mainloop.la gettextNative.la dbusNative.la cairoNative.la system.la formatNative.la
 
 JS_NATIVE_MODULE_CFLAGS =	\
         $(AM_CFLAGS)		\
@@ -105,6 +105,11 @@ system_la_LDFLAGS = 				\
 system_la_SOURCES =		\
 	modules/system.h	\
 	modules/system.c
+
+gjson_la_SOURCES = modules/gjson.c modules/gjson.h
+gjson_la_CFLAGS = $(JS_NATIVE_MODULE_CFLAGS)
+gjson_la_LIBADD = $(JS_NATIVE_MODULE_LIBADD)
+gjson_la_LDFLAGS = $(JS_NATIVE_MODULE_LDFLAGS)
 
 console_la_CFLAGS = 				\
 	$(JS_NATIVE_MODULE_CFLAGS)
