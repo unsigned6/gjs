@@ -31,6 +31,7 @@
 #include <gjs/compat.h>
 #include <gjs/runtime.h>
 #include <glib-object.h>
+#include <gio/gio.h>
 
 G_BEGIN_DECLS
 
@@ -381,6 +382,11 @@ JSBool            gjs_context_get_frame_info (JSContext  *context,
                                               jsval      *stack,
                                               jsval      *fileName,
                                               jsval      *lineNumber);
+
+JSBool gjs_import_file (JSContext *context,
+                        const char *name,
+                        GFile      *file,
+                        JSObject  **module_out);
 
 G_END_DECLS
 

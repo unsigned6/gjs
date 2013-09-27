@@ -1158,3 +1158,72 @@ gjs_unblock_gc(void)
 {
     g_mutex_unlock(&gc_lock);
 }
+
+JSBool
+gjs_import_file (JSContext  *context,
+                 const char *name,
+                 GFile      *file,
+                 JSObject  **module_out)
+{
+    JSBool ret = JS_FALSE;
+    JSObject *module_obj;
+    char *script = NULL;
+    char *full_path = NULL;
+    gsize script_len = 0;
+    jsval script_retval;
+    GError *error = NULL;
+
+    module_obj = JS_NewObject(context, NULL, NULL, NULL);
+    if (module_obj == NULL)
+        goto out;
+
+    if (!(g_file_load_contents(file, NULL, &script, &script_len, NULL, &error))) {
+        if (!g_error_matches(error, G_IO_ERROR, G_IO_ERROR_IS_DIRECTORY) &&
+            !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_NOT_DIRECTORY) &&
+            !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+            gjs_throw_g_error(context, error);
+        else
+            g_error_free(error);
+
+        goto out;
+    }
+
+    g_assert(script != NULL);
+
+    gjs_debug(GJS_DEBUG_IMPORTER, "Importing %s", full_path);
+
+    full_path = g_file_get_parse_name (file);
+
+    if (!JS_EvaluateScript(context,
+                           module_obj,
+                           script,
+                           script_len,
+                           full_path,
+                           1, /* line number */
+                           &script_retval)) {
+
+        /* If JSOPTION_DONT_REPORT_UNCAUGHT is set then the exception
+         * would be left set after the evaluate and not go to the error
+         * reporter function.
+         */
+        if (JS_IsExceptionPending(context)) {
+            gjs_debug(GJS_DEBUG_IMPORTER,
+                      "Module '%s' left an exception set",
+                      name);
+            gjs_log_and_keep_exception(context);
+        } else {
+            gjs_throw(context,
+                         "JS_EvaluateScript() returned FALSE but did not set exception");
+        }
+
+        goto out;
+    }
+
+    ret = JS_TRUE;
+
+ out:
+    g_free(script);
+    g_free(full_path);
+    *module_out = module_obj;
+    return ret;
+}

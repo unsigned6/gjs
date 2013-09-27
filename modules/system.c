@@ -119,12 +119,46 @@ gjs_exit(JSContext *context,
     return JS_TRUE;
 }
 
+static JSBool
+import_file (JSContext *context,
+             unsigned   argc,
+             jsval     *vp)
+{
+    JSBool ret = JS_FALSE;
+    jsval *argv = JS_ARGV(cx, vp);
+    gchar *name = NULL;
+    GFile *file = NULL;
+    JSObject *file_object;
+    JSObject *module_obj;
+
+    if (!gjs_parse_args(context, "importFile", "so", argc, argv,
+                        "name", &name,
+                        "object", &file_object))
+        goto out;
+
+    file = G_FILE (gjs_g_object_from_object (context, file_object));
+    if (file == NULL)
+        goto out;
+
+    if (!gjs_import_file (context, name, file, &module_obj))
+        goto out;
+
+    JS_SET_RVAL (cx, argv, OBJECT_TO_JSVAL (module_obj));
+
+    ret = JS_TRUE;
+ out:
+    g_free (name);
+    g_object_unref (file);
+    return ret;
+}
+
 static JSFunctionSpec module_funcs[] = {
     { "addressOf", JSOP_WRAPPER (gjs_address_of), 1, GJS_MODULE_PROP_FLAGS },
     { "refcount", JSOP_WRAPPER (gjs_refcount), 1, GJS_MODULE_PROP_FLAGS },
     { "breakpoint", JSOP_WRAPPER (gjs_breakpoint), 0, GJS_MODULE_PROP_FLAGS },
     { "gc", JSOP_WRAPPER (gjs_gc), 0, GJS_MODULE_PROP_FLAGS },
     { "exit", JSOP_WRAPPER (gjs_exit), 0, GJS_MODULE_PROP_FLAGS },
+    { "importFile", JSOP_WRAPPER (import_file), 0, GJS_MODULE_PROP_FLAGS },
     { NULL },
 };
 
