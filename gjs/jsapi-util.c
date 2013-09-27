@@ -1159,6 +1159,58 @@ gjs_unblock_gc(void)
     g_mutex_unlock(&gc_lock);
 }
 
+static JSBool
+create_module_object (JSContext  *context,
+                      const char *name,
+                      GFile      *file,
+                      JSObject  **module_obj_out)
+{
+    JSBool ret = JS_FALSE;
+    JSObject *obj = JS_NewObject (context, NULL, NULL, NULL);
+    char *url = NULL;
+
+    {
+        JSObject *exports = JS_NewObject (context, NULL, NULL, NULL);
+
+        if (!JS_DefineProperty(context, obj, "exports", OBJECT_TO_JSVAL (exports),
+                               NULL, NULL, JSPROP_READONLY | JSPROP_PERMANENT))
+            goto out;
+    }
+
+    {
+        JSObject *module = JS_NewObject (context, NULL, NULL, NULL);
+        jsval id_val;
+        jsval url_val;
+
+        if (!gjs_string_from_utf8 (context, name, -1, &id_val))
+            goto out;
+
+        if (!JS_DefineProperty(context, module, "id", id_val, NULL, NULL,
+                               JSPROP_READONLY | JSPROP_PERMANENT))
+            goto out;
+
+        url = g_file_get_uri (file);
+
+        if (!gjs_string_from_utf8 (context, url, -1, &url_val))
+            goto out;
+
+        if (!JS_DefineProperty(context, module, "url", url_val, NULL, NULL,
+                               JSPROP_READONLY | JSPROP_PERMANENT))
+            goto out;
+
+        if (!JS_DefineProperty(context, obj, "module", OBJECT_TO_JSVAL (module),
+                               NULL, NULL, JSPROP_READONLY | JSPROP_PERMANENT))
+            goto out;
+    }
+
+    ret = JS_TRUE;
+
+ out:
+    g_free (url);
+    *module_obj_out = obj;
+    return ret;
+}
+
 JSBool
 gjs_import_file (JSContext  *context,
                  const char *name,
@@ -1173,8 +1225,7 @@ gjs_import_file (JSContext  *context,
     jsval script_retval;
     GError *error = NULL;
 
-    module_obj = JS_NewObject(context, NULL, NULL, NULL);
-    if (module_obj == NULL)
+    if (!create_module_object (context, name, file, &module_obj))
         goto out;
 
     if (!(g_file_load_contents(file, NULL, &script, &script_len, NULL, &error))) {
