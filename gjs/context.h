@@ -35,6 +35,8 @@ G_BEGIN_DECLS
 typedef struct _GjsContext      GjsContext;
 typedef struct _GjsContextClass GjsContextClass;
 
+typedef struct _GjsDebugHooks   GjsDebugHooks;
+
 #define GJS_TYPE_CONTEXT              (gjs_context_get_type ())
 #define GJS_CONTEXT(object)           (G_TYPE_CHECK_INSTANCE_CAST ((object), GJS_TYPE_CONTEXT, GjsContext))
 #define GJS_CONTEXT_CLASS(klass)      (G_TYPE_CHECK_CLASS_CAST ((klass), GJS_TYPE_CONTEXT, GjsContextClass))
@@ -61,6 +63,7 @@ gboolean        gjs_context_define_string_array  (GjsContext  *js_context,
                                                   gssize         array_length,
                                                   const char   **array_values,
                                                   GError       **error);
+GjsDebugHooks*  gjs_context_get_debug_hooks      (GjsContext *js_context);
 
 GList*          gjs_context_get_all              (void);
 

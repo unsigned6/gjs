@@ -353,6 +353,7 @@ main(int    argc,
     g_test_add_func("/util/glib/strv/concat/pointers", gjstest_test_func_util_glib_strv_concat_pointers);
 
     gjs_test_add_tests_for_reflected_script();
+    gjs_test_add_tests_for_debug_hooks ();
 
     g_test_run();
 

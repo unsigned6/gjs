@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013 Endless Mobile, Inc.
+ * Copyright © 2014 Endless Mobile, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,18 @@
  *
  * Authored By: Sam Spilsbury <sam@endlessm.com>
  */
-#ifndef GJS_TESTS_ADD_FUNCS_H
-#define GJS_TESTS_ADD_FUNCS_H
+#ifndef GJS_DEBUG_HOOKS_PRIVATE_H
+#define GJS_DEBUG_HOOKS_PRIVATE_H
 
-void gjs_test_add_tests_for_reflected_script ();
-void gjs_test_add_tests_for_debug_hooks ();
+#include <glib.h>
+
+G_BEGIN_DECLS
+
+struct _GjsDebugScriptInfo {
+    const char         *filename;
+    unsigned int       begin_line;
+};
+
+G_END_DECLS
 
 #endif
