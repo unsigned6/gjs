@@ -38,6 +38,7 @@ nobase_gjs_module_include_HEADERS =	\
 	gjs/native.h	\
 	gjs/reflected-script.h \
 	gjs/debug-hooks.h \
+	gjs/coverage.h \
 	gi/ns.h	        \
 	gi/object.h	\
 	gi/foreign.h	\
@@ -112,6 +113,7 @@ libgjs_la_SOURCES =		\
 	gjs/gi.cpp		\
 	gjs/reflected-script.cpp \
 	gjs/debug-hooks.cpp \
+	gjs/coverage.cpp \
 	gjs/jsapi-private.cpp	\
 	gjs/jsapi-util.cpp	\
 	gjs/jsapi-dynamic-class.cpp \
@@ -211,10 +213,10 @@ bin_PROGRAMS += gjs-console
 
 gjs_console_CPPFLAGS = 		\
 	$(AM_CPPFLAGS)		\
-        $(GOBJECT_CFLAGS)
+        $(GJS_CONSOLE_CFLAGS)
 gjs_console_LDADD =		\
-	$(JS_LIBS)		\
-	$(GOBJECT_LIBS)		\
+        $(JS_LIBS)		\
+        $(GJS_CONSOLE_LIBS)	\
 	libgjs.la
 gjs_console_LDFLAGS = -rdynamic
 gjs_console_SOURCES = gjs/console.cpp

@@ -22,5 +22,6 @@
 
 void gjs_test_add_tests_for_reflected_script ();
 void gjs_test_add_tests_for_debug_hooks ();
+void gjs_test_add_tests_for_coverage ();
 
 #endif

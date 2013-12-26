@@ -74,6 +74,7 @@ AC_CHECK_FUNCS(mallinfo)
 GOBJECT_INTROSPECTION_REQUIRE([1.38.0])
 
 common_packages="gmodule-2.0 gthread-2.0 gio-2.0 >= glib_required_version mozjs-24"
+gjs_console_packages="gio-2.0 >= glib_required_version gobject-2.0 >= glib_required_version"
 gjs_packages="gobject-introspection-1.0 libffi $common_packages"
 gjs_cairo_packages="cairo cairo-gobject $common_packages"
 gjs_gdbus_packages="gobject-2.0 >= glib_required_version gio-2.0"
@@ -81,12 +82,12 @@ gjs_gtk_packages="gtk+-3.0"
 # gjs-tests links against everything
 gjstests_packages="$gjstests_packages $gjs_packages"
 
-PKG_CHECK_MODULES([GOBJECT], [gobject-2.0 >= glib_required_version])
 PKG_CHECK_MODULES([GJS], [$gjs_packages])
 PKG_CHECK_MODULES([GJS_GDBUS], [$gjs_gdbus_packages])
 PKG_CHECK_MODULES([GJSTESTS], [$gjstests_packages])
 
 # Optional cairo dep (enabled by default)
+PKG_CHECK_MODULES([GJS_CONSOLE], [$gjs_console_packages])
 AC_ARG_WITH(cairo,
 	    AS_HELP_STRING([--without-cairo], [Use cairo @<:@default=yes@:>@]),
 	    [], [with_cairo=yes])

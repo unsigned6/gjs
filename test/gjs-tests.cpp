@@ -354,6 +354,7 @@ main(int    argc,
 
     gjs_test_add_tests_for_reflected_script();
     gjs_test_add_tests_for_debug_hooks ();
+    gjs_test_add_tests_for_coverage ();
 
     g_test_run();
 

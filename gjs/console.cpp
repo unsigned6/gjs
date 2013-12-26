@@ -27,12 +27,17 @@
 #include <locale.h>
 
 #include <gjs/gjs.h>
+#include <gjs/coverage.h>
 
 static char **include_path = NULL;
+static char **coverage_paths = NULL;
+static char *coverage_output_path = NULL;
 static char *command = NULL;
 
 static GOptionEntry entries[] = {
     { "command", 'c', 0, G_OPTION_ARG_STRING, &command, "Program passed in as a string", "COMMAND" },
+    { "coverage-path", 'C', 0, G_OPTION_ARG_STRING_ARRAY, &coverage_paths, "Add the directory DIR to the list of directories to generate coverage info for", "DIR" },
+    { "coverage-output", 0, 0, G_OPTION_ARG_STRING, &coverage_output_path, "Write coverage output to a directory DIR. This option is mandatory when using --coverage-path", "DIR", },
     { "include-path", 'I', 0, G_OPTION_ARG_STRING_ARRAY, &include_path, "Add the directory DIR to the list of directories to search for js files.", "DIR" },
     { NULL }
 };
@@ -51,12 +56,35 @@ print_help (GOptionContext *context,
   exit (0);
 }
 
+static GValue *
+init_array_parameter(GArray      *array,
+                     guint       index,
+                     const gchar *name,
+                     GType       type)
+{
+    if (index >= array->len)
+        g_array_set_size(array, index + 1);
+
+    GParameter *param = &(g_array_index(array, GParameter, index));
+    param->name = name;
+    g_value_init(&param->value, type);
+    return &param->value;
+}
+
+static void
+clear_array_parameter_value(gpointer value)
+{
+    GParameter *parameter = (GParameter *) value;
+    g_value_unset(&parameter->value);
+}
+
 int
 main(int argc, char **argv)
 {
     GOptionContext *context;
     GError *error = NULL;
     GjsContext *js_context;
+    GjsCoverage *coverage = NULL;
     char *script;
     const char *filename;
     const char *program_name;
@@ -111,6 +139,14 @@ main(int argc, char **argv)
                                             "program-name", program_name,
                                             NULL);
 
+    if (coverage_paths) {
+        if (!coverage_output_path)
+            g_error("--coverage-output-path is required when taking coverage statistics");
+
+        coverage = gjs_coverage_new(gjs_context_get_debug_hooks(js_context),
+                                    (const gchar **) coverage_paths);
+    }
+
     /* prepare command line arguments */
     if (!gjs_context_define_string_array(js_context, "ARGV",
                                          argc - 1, (const char**)argv + 1,
@@ -128,6 +164,11 @@ main(int argc, char **argv)
         g_printerr("%s\n", error->message);
         g_clear_error(&error);
         goto out;
+    }
+
+    if (coverage) {
+        gjs_coverage_write_statistics(coverage, coverage_output_path);
+        g_clear_object(&coverage);
     }
 
  out:
