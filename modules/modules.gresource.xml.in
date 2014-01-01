@@ -14,6 +14,7 @@
     <file>modules/gettext.js</file>
     <file>modules/lang.js</file>
     <file>modules/mainloop.js</file>
+    <file>modules/infoReflect.js</file>
     <file>modules/jsUnit.js</file>
     <file>modules/signals.js</file>
     <file>modules/format.js</file>

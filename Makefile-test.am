@@ -22,7 +22,8 @@ gjs_tests_LDADD =		\
 	$(GJSTESTS_LIBS)
 
 gjs_tests_SOURCES =		\
-	test/gjs-tests.cpp
+	test/gjs-tests.cpp \
+	test/gjs-test-reflected-script.cpp
 
 check-local: gjs-tests
 	@test -z "${TEST_PROGS}" || ${GTESTER} --verbose ${TEST_PROGS} ${TEST_PROGS_OPTIONS}

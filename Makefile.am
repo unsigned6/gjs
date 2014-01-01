@@ -36,6 +36,7 @@ nobase_gjs_module_include_HEADERS =	\
 	gjs/type-module.h	\
 	gjs/mem.h		\
 	gjs/native.h	\
+	gjs/reflected-script.h \
 	gi/ns.h	        \
 	gi/object.h	\
 	gi/foreign.h	\
@@ -55,6 +56,7 @@ nobase_gjs_module_include_HEADERS =	\
 
 noinst_HEADERS +=		\
 	gjs/jsapi-private.h	\
+	gjs/reflected-script-private.h \
 	gi/proxyutils.h		\
 	util/crash.h		\
 	util/hash-x32.h		\
@@ -106,6 +108,7 @@ libgjs_la_SOURCES =		\
 	gjs/importer.cpp		\
 	gjs/gi.h		\
 	gjs/gi.cpp		\
+	gjs/reflected-script.cpp \
 	gjs/jsapi-private.cpp	\
 	gjs/jsapi-util.cpp	\
 	gjs/jsapi-dynamic-class.cpp \

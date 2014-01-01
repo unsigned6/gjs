@@ -109,6 +109,7 @@ dist_jstests_DATA += \
 	installed-tests/js/testGObjectClass.js		\
 	installed-tests/js/testJS1_8.js			\
 	installed-tests/js/testLang.js			\
+	installed-tests/js/testInfoReflect.js		\
 	installed-tests/js/testLocale.js			\
 	installed-tests/js/testMainloop.js			\
 	installed-tests/js/testMetaClass.js			\
