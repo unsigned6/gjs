@@ -92,9 +92,7 @@ resolve_namespace_object(JSContext  *context,
                          jsid        ns_id,
                          const char *ns_name)
 {
-    GIRepository *repo;
-    GError *error;
-    char *version;
+    char *version = NULL;
     JSObject *override;
     jsval result;
     JSObject *gi_namespace = NULL;
@@ -105,27 +103,13 @@ resolve_namespace_object(JSContext  *context,
     if (!get_version_for_ns(context, repo_obj, ns_id, &version))
         goto out;
 
-    repo = g_irepository_get_default();
-
-    error = NULL;
-    g_irepository_require(repo, ns_name, version, (GIRepositoryLoadFlags) 0, &error);
-    if (error != NULL) {
-        gjs_throw(context,
-                  "Requiring %s, version %s: %s",
-                  ns_name, version?version:"none", error->message);
-
-        g_error_free(error);
-        g_free(version);
-        goto out;
-    }
-
-    g_free(version);
-
     /* Defines a property on "obj" (the javascript repo object)
      * with the given namespace name, pointing to that namespace
      * in the repo.
      */
-    gi_namespace = gjs_create_ns(context, ns_name);
+    if (!gjs_import_gi_module(context, ns_name, version, &gi_namespace))
+        goto out;
+
     JS_AddObjectRoot(context, &gi_namespace);
 
     /* Define the property early, to avoid reentrancy issues if
@@ -152,6 +136,7 @@ resolve_namespace_object(JSContext  *context,
     gjs_schedule_gc_if_needed(context);
 
  out:
+    g_free(version);
     if (gi_namespace)
         JS_RemoveObjectRoot(context, &gi_namespace);
     JS_EndRequest(context);

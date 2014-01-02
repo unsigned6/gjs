@@ -30,8 +30,10 @@
 
 G_BEGIN_DECLS
 
-JSObject* gjs_create_ns(JSContext    *context,
-                        const char   *ns_name);
+gboolean gjs_import_gi_module(JSContext    *context,
+                              const char   *module_name,
+                              const char   *module_version,
+                              JSObject    **module_out);
 
 G_END_DECLS
 

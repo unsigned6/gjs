@@ -172,9 +172,10 @@ JSFunctionSpec gjs_ns_proto_funcs[] = {
     { NULL }
 };
 
-static JSObject*
+static JSBool
 ns_new(JSContext    *context,
-       const char   *ns_name)
+       const char   *ns_name,
+       JSObject    **module_out)
 {
     JSObject *ns;
     JSObject *global;
@@ -232,12 +233,30 @@ ns_new(JSContext    *context,
 
     priv = priv_from_js(context, ns);
     priv->gi_namespace = g_strdup(ns_name);
-    return ns;
+    *module_out = ns;
+    return JS_TRUE;
 }
 
-JSObject*
-gjs_create_ns(JSContext    *context,
-              const char   *ns_name)
+gboolean
+gjs_import_gi_module(JSContext    *context,
+                     const char   *module_name,
+                     const char   *module_version,
+                     JSObject    **module_out)
 {
-    return ns_new(context, ns_name);
+    GIRepository *repo = g_irepository_get_default();
+    gboolean ret = FALSE;
+    GError *error = NULL;
+
+    if (!g_irepository_require(repo, module_name, module_version, (GIRepositoryLoadFlags) 0, &error)) {
+        gjs_throw_g_error(context, error);
+        goto out;
+    }
+
+    if (!ns_new(context, module_name, module_out))
+        goto out;
+
+    ret = TRUE;
+ out:
+    g_clear_error(&error);
+    return ret;
 }
