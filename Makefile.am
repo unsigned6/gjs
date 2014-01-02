@@ -35,7 +35,6 @@ nobase_gjs_module_include_HEADERS =	\
 	gjs/compat.h		\
 	gjs/coverage.h \
 	gjs/byteArray.h		\
-	gjs/importer.h		\
 	gjs/jsapi-util.h	\
 	gjs/runtime.h		\
 	gjs/type-module.h	\
@@ -112,10 +111,8 @@ libgjs_la_SOURCES =		\
 	gjs/byteArray.cpp		\
 	gjs/context.cpp		\
 	gjs/bootstrap.cpp	\
-	gjs/importer.cpp		\
 	gjs/gi.h		\
-	gjs/gi.cpp		\
-	gjs/coverage.cpp \
+	gjs/coverage.cpp	\
 	gjs/jsapi-private.cpp	\
 	gjs/jsapi-util.cpp	\
 	gjs/jsapi-dynamic-class.cpp \

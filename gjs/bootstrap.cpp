@@ -26,8 +26,47 @@
 #include <gjs/gjs.h>
 
 #include "bootstrap.h"
+#include "native.h"
 
 #include <gio/gio.h>
+
+/* The bootstrap process is the thing that sets up the import system.
+ * As such, we give it a hook to import any native modules it may need.
+ *
+ * The rest of the functionality that the bootstrap code needs should be
+ * in independent native modules which can be imported by this API,
+ * rather than in the bootstrap environment.
+ */
+
+static JSBool
+import_native_module(JSContext *context,
+                     unsigned   argc,
+                     jsval     *vp)
+{
+    JSBool ret = JS_FALSE;
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    char *module_name = NULL;
+    JSObject *module_obj;
+
+    if (!gjs_parse_call_args(context, "importNativeModule", "s", args,
+                             "moduleName", &module_name))
+        goto out;
+
+    if (!gjs_import_native_module(context, module_name, &module_obj))
+        goto out;
+
+    ret = JS_TRUE;
+    args.rval().setObjectOrNull(module_obj);
+
+ out:
+    g_free(module_name);
+    return ret;
+}
+
+static JSFunctionSpec environment_funcs[] = {
+    { "importNativeModule", JSOP_WRAPPER (import_native_module), 1, GJS_MODULE_PROP_FLAGS },
+    { NULL },
+};
 
 static gboolean
 define_bootstrap_environment(JSContext  *context,
@@ -36,6 +75,9 @@ define_bootstrap_environment(JSContext  *context,
     JSObject *environment = JS_NewObject(context, NULL, NULL, NULL);
 
     if (!environment)
+        return FALSE;
+
+    if (!JS_DefineFunctions(context, environment, &environment_funcs[0]))
         return FALSE;
 
     *environment_out = environment;

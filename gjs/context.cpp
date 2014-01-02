@@ -27,7 +27,6 @@
 
 #include "context-private.h"
 #include "bootstrap.h"
-#include "importer.h"
 #include "jsapi-private.h"
 #include "jsapi-util.h"
 #include "native.h"
@@ -78,10 +77,8 @@ struct _GjsContext {
 /* Keep this consistent with GjsConstString */
 static const char *const_strings[] = {
     "constructor", "prototype", "length",
-    "imports", "__parentModule__", "__init__", "searchPath",
     "__gjsKeepAlive", "__gjsPrivateNS",
-    "gi", "versions", "overrides",
-    "_init", "_instance_init", "_new_internal", "new",
+    "gi", "_init", "_instance_init", "_new_internal", "new",
     "message", "code", "stack", "fileName", "lineNumber", "name",
     "x", "y", "width", "height",
 };
@@ -321,7 +318,6 @@ gjs_context_class_init(GjsContextClass *klass)
 
     gjs_register_native_module("byteArray", gjs_define_byte_array_stuff);
     gjs_register_native_module("_gi", gjs_define_private_gi_stuff);
-    gjs_register_native_module("gi", gjs_define_gi_stuff);
 
     gjs_register_static_modules();
 }
@@ -442,24 +438,6 @@ gjs_context_constructed(GObject *object)
 
     if (!JS_DefineFunctions(js_context->context, js_context->global, &global_funcs[0]))
         g_error("Failed to define properties on the global object");
-
-    /* We create the global-to-runtime root importer with the
-     * passed-in search path. If someone else already created
-     * the root importer, this is a no-op.
-     */
-    if (!gjs_create_root_importer(js_context->context,
-                                  js_context->search_path ?
-                                  (const char**) js_context->search_path :
-                                  NULL,
-                                  TRUE))
-        g_error("Failed to create root importer");
-
-    /* Now copy the global root importer (which we just created,
-     * if it didn't exist) to our global object
-     */
-    if (!gjs_define_root_importer(js_context->context,
-                                  js_context->global))
-        g_error("Failed to point 'imports' property at root importer");
 
     if (!gjs_run_bootstrap(js_context->context))
         g_error("Failed to bootstrap GJS context");
@@ -791,6 +769,12 @@ gjs_get_import_global(JSContext *context)
 {
     GjsContext *gjs_context = (GjsContext *) JS_GetContextPrivate(context);
     return gjs_context->global;
+}
+
+const char **
+gjs_context_get_search_path(GjsContext *context)
+{
+    return (const char **) context->search_path;
 }
 
 G_CONST_RETURN char * G_CONST_RETURN *

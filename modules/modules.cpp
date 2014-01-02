@@ -32,6 +32,7 @@
 
 #include "system.h"
 #include "console.h"
+#include "importer.h"
 
 void
 gjs_register_static_modules (void)
@@ -40,5 +41,6 @@ gjs_register_static_modules (void)
     gjs_register_native_module("cairoNative", gjs_js_define_cairo_stuff);
 #endif
     gjs_register_native_module("system", gjs_js_define_system_stuff);
+    gjs_register_native_module("_importer", gjs_js_define_importer_stuff);
     gjs_register_native_module("console", gjs_define_console_stuff);
 }

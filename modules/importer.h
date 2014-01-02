@@ -1,6 +1,6 @@
 /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 /*
- * Copyright (c) 2008  litl, LLC
+ * Copyright 2013 Red Hat, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -21,19 +21,18 @@
  * IN THE SOFTWARE.
  */
 
-#include "gi.h"
+#ifndef __GJS_MODULE_IMPORTER_H__
+#define __GJS_MODULE_IMPORTER_H__
 
-#include <util/misc.h>
+#include <config.h>
+#include <glib.h>
+#include "gjs/jsapi-util.h"
 
-#include <string.h>
+G_BEGIN_DECLS
 
-#include "gjs/native.h"
-#include "gjs/compat.h"
-#include "gi/repo.h"
+JSBool        gjs_js_define_importer_stuff   (JSContext      *context,
+                                              JSObject      **module_out);
 
-JSBool
-gjs_define_gi_stuff(JSContext      *context,
-                    JSObject      **module_out)
-{
-    return gjs_define_repo(context, module_out, "gi");
-}
+G_END_DECLS
+
+#endif  /* __GJS_MODULE_IMPORTER_H__ */

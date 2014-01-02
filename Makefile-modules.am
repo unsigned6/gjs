@@ -1,6 +1,5 @@
 
-NATIVE_MODULES = libconsole.la libsystem.la libmodules_resources.la
-
+NATIVE_MODULES = libconsole.la libsystem.la libmodules_resources.la libimporter.la
 if ENABLE_CAIRO
 NATIVE_MODULES += libcairoNative.la
 endif
@@ -56,3 +55,7 @@ libsystem_la_SOURCES = modules/system.h modules/system.cpp
 libconsole_la_CPPFLAGS = $(JS_NATIVE_MODULE_CFLAGS)
 libconsole_la_LIBADD = $(JS_NATIVE_MODULE_LIBADD) $(READLINE_LIBS)
 libconsole_la_SOURCES = modules/console.h modules/console.cpp
+
+libimporter_la_CPPFLAGS = $(JS_NATIVE_MODULE_CFLAGS)
+libimporter_la_LIBADD = $(JS_NATIVE_MODULE_LIBADD)
+libimporter_la_SOURCES = modules/importer.h modules/importer.cpp

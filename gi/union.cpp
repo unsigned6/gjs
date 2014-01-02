@@ -25,7 +25,6 @@
 
 #include <string.h>
 
-/* include first for logging related #define used in repo.h */
 #include <util/log.h>
 
 #include "union.h"
