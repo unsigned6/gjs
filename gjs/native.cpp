@@ -97,12 +97,10 @@ gjs_import_native_module(JSContext   *context,
     else
         func = NULL;
 
-    if (!func) {
-        gjs_throw(context,
-                  "No native module '%s' has registered itself",
-                  name);
-        return JS_FALSE;
+    if (func) {
+        return func (context, module_out);
+    } else {
+        *module_out = NULL;
+        return JS_TRUE;
     }
-
-    return func (context, module_out);
 }
