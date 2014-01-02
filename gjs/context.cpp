@@ -26,6 +26,7 @@
 #include <gio/gio.h>
 
 #include "context-private.h"
+#include "bootstrap.h"
 #include "importer.h"
 #include "jsapi-private.h"
 #include "jsapi-util.h"
@@ -459,6 +460,9 @@ gjs_context_constructed(GObject *object)
     if (!gjs_define_root_importer(js_context->context,
                                   js_context->global))
         g_error("Failed to point 'imports' property at root importer");
+
+    if (!gjs_run_bootstrap(js_context->context))
+        g_error("Failed to bootstrap GJS context");
 
     JS_EndRequest(js_context->context);
 

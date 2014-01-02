@@ -30,6 +30,7 @@ nobase_gjs_public_include_HEADERS =	\
 	gjs/gjs.h
 
 nobase_gjs_module_include_HEADERS =	\
+	gjs/bootstrap.h		\
 	gjs/gjs-module.h	\
 	gjs/compat.h		\
 	gjs/coverage.h \
@@ -110,6 +111,7 @@ endif
 libgjs_la_SOURCES =		\
 	gjs/byteArray.cpp		\
 	gjs/context.cpp		\
+	gjs/bootstrap.cpp	\
 	gjs/importer.cpp		\
 	gjs/gi.h		\
 	gjs/gi.cpp		\
