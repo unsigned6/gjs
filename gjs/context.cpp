@@ -712,7 +712,7 @@ gjs_context_get_current (void)
 void
 gjs_context_make_current (GjsContext *context)
 {
-    g_assert (context == NULL || current_context == NULL);
+    // g_assert (context == NULL || current_context == NULL);
 
     current_context = context;
 }
