@@ -22,8 +22,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include <jsapi.h>
-#include <jsdbgapi.h>
 #include <gjs/gjs.h>
 #include <gjs/jsapi-util.h>
 #include <gjs/debug-hooks.h>
