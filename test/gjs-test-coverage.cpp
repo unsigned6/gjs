@@ -31,14 +31,11 @@
 #include <glib.h>
 #include <gio/gio.h>
 #include <gjs/gjs.h>
-#include <gjs/debug-hooks.h>
-#include <gjs/debug-hooks-private.h>
 #include <gjs/reflected-script-private.h>
 #include <gjs/coverage.h>
 
 typedef struct _GjsCoverageFixture {
     GjsContext    *context;
-    GjsDebugHooks *debug_hooks;
     GjsCoverage   *coverage;
     char          *temporary_js_script_directory_name;
     char          *temporary_js_script_filename;
@@ -125,9 +122,7 @@ gjs_coverage_fixture_set_up(gpointer      fixture_data,
     };
 
     fixture->context = gjs_context_new_with_search_path((char **) search_paths);
-    fixture->debug_hooks = gjs_debug_hooks_new (fixture->context);
-    fixture->coverage = gjs_coverage_new(fixture->debug_hooks,
-                                         coverage_paths);
+    fixture->coverage = gjs_coverage_new(fixture->context, coverage_paths);
 
     write_to_file(fixture->temporary_js_script_open_handle, js_script);
 }
@@ -144,7 +139,6 @@ gjs_coverage_fixture_tear_down(gpointer      fixture_data,
     g_free(fixture->temporary_js_script_directory_name);
 
     g_object_unref(fixture->coverage);
-    g_object_unref(fixture->debug_hooks);
     g_object_unref(fixture->context);
 }
 
@@ -355,9 +349,7 @@ test_covered_file_is_duplicated_into_output_if_resource(gpointer      fixture_da
     };
 
     g_object_unref(fixture->base_fixture.coverage);
-    fixture->base_fixture.coverage =
-        gjs_coverage_new(fixture->base_fixture.debug_hooks,
-                         coverage_scripts);
+    fixture->base_fixture.coverage = gjs_coverage_new(fixture->base_fixture.context, coverage_scripts);
 
     gjs_context_eval_file(fixture->base_fixture.context,
                           mock_resource_filename,
@@ -1048,8 +1040,7 @@ gjs_coverage_multiple_source_files_to_single_output_fixture_set_up(gpointer fixt
     };
 
     g_object_unref(fixture->base_fixture.base_fixture.coverage);
-    fixture->base_fixture.base_fixture.coverage = gjs_coverage_new(fixture->base_fixture.base_fixture.debug_hooks,
-                                                                   coverage_paths);
+    fixture->base_fixture.base_fixture.coverage = gjs_coverage_new(fixture->base_fixture.base_fixture.context, coverage_paths);
 
     char *base_name = g_path_get_basename(fixture->base_fixture.base_fixture.temporary_js_script_filename);
     char *base_name_without_extension = g_strndup(base_name,

@@ -78,8 +78,8 @@ GType gjs_debug_coverage_get_type(void);
 void gjs_coverage_write_statistics(GjsCoverage *coverage,
                                    const char  *output_directory);
 
-GjsCoverage * gjs_coverage_new(GjsDebugHooks *debug_hooks,
-                               const char    **covered_directories);
+GjsCoverage * gjs_coverage_new(GjsContext  *context,
+                               const char **covered_directories);
 
 G_END_DECLS
 

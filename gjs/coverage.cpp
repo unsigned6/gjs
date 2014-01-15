@@ -31,22 +31,9 @@
 typedef struct _GjsCoverageBranchData GjsCoverageBranchData;
 
 struct _GjsCoveragePrivate {
+    GjsContext    *context;
     GHashTable    *file_statistics;
-    GjsDebugHooks *debug_hooks;
     gchar         **covered_paths;
-
-    /* A separate context where reflection is performed. We don't
-     * want to use the main context because we don't want to
-     * modify its state while it is being debugged.
-     *
-     * A single context is shared across all reflections because
-     * the reflection functions are effectively const.
-     *
-     * This is created on-demand when debugging is enabled. GjsContext
-     * creates an instance of us by default so we obviously don't want
-     * to recurse into creating an instance of GjsContext by default.
-     */
-    GjsContext *reflection_context;
 
     guint         new_scripts_connection;
     guint         single_step_connection;
@@ -68,7 +55,7 @@ G_DEFINE_TYPE_WITH_PRIVATE(GjsCoverage,
 
 enum {
     PROP_0,
-    PROP_DEBUG_HOOKS,
+    PROP_CONTEXT,
     PROP_COVERAGE_PATHS,
     PROP_N
 };
@@ -496,13 +483,10 @@ create_statistics_from_reflection(GjsReflectedScript *reflected_script)
 }
 
 static GjsCoverageFileStatistics *
-new_statistics_for_filename(GjsContext *reflection_context,
-                            const char *filename)
+new_statistics_for_filename(GjsContext *context, const char *filename)
 {
-    GjsReflectedScript *reflected_script =
-        gjs_reflected_script_new(filename, reflection_context);
-    GjsCoverageFileStatistics *stats =
-        create_statistics_from_reflection(reflected_script);
+    GjsReflectedScript *reflected_script = gjs_reflected_script_new(context, filename);
+    GjsCoverageFileStatistics *stats = create_statistics_from_reflection(reflected_script);
     g_object_unref(reflected_script);
 
     return stats;
@@ -525,7 +509,7 @@ gjs_coverage_new_script_available_hook(GjsDebugHooks      *reg,
                                                               filename);
 
         if (!statistics) {
-            statistics = new_statistics_for_filename(priv->reflection_context, filename);
+            statistics = new_statistics_for_filename(context, filename);
 
             /* If create_statistics_for_filename returns NULL then we can
              * just bail out here, the stats print function will handle
@@ -836,7 +820,7 @@ copy_source_file_to_coverage_output(const char *source,
 }
 
 typedef struct _StatisticsPrintUserData {
-    GjsContext        *reflection_context;
+    GjsContext        *context;
     GFileOutputStream *ostream;
     const gchar       *output_directory;
 } StatisticsPrintUserData;
@@ -944,8 +928,7 @@ print_statistics_for_files(gpointer key,
     /* If there is no statistics for this file, then we should
      * compile the script and print statistics for it now */
     if (!stats)
-        stats = new_statistics_for_filename(statistics_print_data->reflection_context,
-                                                             filename);
+        stats = new_statistics_for_filename(statistics_print_data->context, filename);
 
     /* Still couldn't create statistics, bail out */
     if (!stats)
@@ -1019,6 +1002,7 @@ gjs_coverage_write_statistics(GjsCoverage *coverage,
     GjsCoveragePrivate *priv = (GjsCoveragePrivate *) gjs_coverage_get_instance_private(coverage);
     GError *error = NULL;
     GFileOutputStream *ostream = NULL;
+    GjsDebugHooks *hooks = gjs_context_get_debug_hooks(priv->context);
 
     /* Create output_directory if it doesn't exist */
     g_mkdir_with_parents(output_directory, 0755);
@@ -1031,7 +1015,7 @@ gjs_coverage_write_statistics(GjsCoverage *coverage,
 
     /* Remove our new script hook so that we don't get spurious calls
      * to it whilst compiling new scripts */
-    gjs_debug_hooks_remove_script_load_hook(priv->debug_hooks, priv->new_scripts_connection);
+    gjs_debug_hooks_remove_script_load_hook(hooks, priv->new_scripts_connection);
     priv->new_scripts_connection = 0;
 
     ostream = g_file_append_to(output_file,
@@ -1052,7 +1036,7 @@ gjs_coverage_write_statistics(GjsCoverage *coverage,
      * case just fine, so there's no need to return if
      * output_file is NULL */
     StatisticsPrintUserData data = {
-        priv->reflection_context,
+        priv->context,
         ostream,
         output_directory
     };
@@ -1065,10 +1049,9 @@ gjs_coverage_write_statistics(GjsCoverage *coverage,
     g_object_unref(output_file);
 
     /* Re-insert our new script hook in case we need it again */
-    priv->new_scripts_connection =
-        gjs_debug_hooks_add_script_load_hook(priv->debug_hooks,
-                                             gjs_coverage_new_script_available_hook,
-                                             coverage);
+    priv->new_scripts_connection = gjs_debug_hooks_add_script_load_hook(hooks,
+                                                                        gjs_coverage_new_script_available_hook,
+                                                                        coverage);
 }
 
 static void
@@ -1083,7 +1066,6 @@ gjs_coverage_init(GjsCoverage *self)
 {
     GjsCoveragePrivate *priv = (GjsCoveragePrivate *) gjs_coverage_get_instance_private(self);
 
-    priv->reflection_context =  gjs_reflected_script_create_reflection_context();
     priv->file_statistics = g_hash_table_new_full(g_str_hash,
                                                   g_str_equal,
                                                   g_free,
@@ -1098,6 +1080,7 @@ gjs_coverage_constructed(GObject *object)
 
     GjsCoverage *coverage = GJS_DEBUG_COVERAGE(object);
     GjsCoveragePrivate *priv = (GjsCoveragePrivate *) gjs_coverage_get_instance_private(coverage);
+    GjsDebugHooks *hooks = gjs_context_get_debug_hooks(priv->context);
 
     /* Take the list of covered paths and add them to the coverage report */
     if (priv->covered_paths) {
@@ -1116,20 +1099,17 @@ gjs_coverage_constructed(GObject *object)
     }
 
     /* Add hook for new scripts and singlestep execution */
-    priv->new_scripts_connection =
-        gjs_debug_hooks_add_script_load_hook(priv->debug_hooks,
-                                             gjs_coverage_new_script_available_hook,
-                                             coverage);
+    priv->new_scripts_connection = gjs_debug_hooks_add_script_load_hook(hooks,
+                                                                        gjs_coverage_new_script_available_hook,
+                                                                        coverage);
 
-    priv->single_step_connection =
-        gjs_debug_hooks_add_singlestep_hook(priv->debug_hooks,
-                                            gjs_coverage_single_step_interrupt_hook,
-                                            coverage);
+    priv->single_step_connection = gjs_debug_hooks_add_singlestep_hook(hooks,
+                                                                       gjs_coverage_single_step_interrupt_hook,
+                                                                       coverage);
 
-    priv->frame_step_connection =
-        gjs_debug_hooks_add_frame_step_hook(priv->debug_hooks,
-                                            gjs_coverage_frame_execution_hook,
-                                            priv->file_statistics);
+    priv->frame_step_connection = gjs_debug_hooks_add_frame_step_hook(hooks,
+                                                                      gjs_coverage_frame_execution_hook,
+                                                                      priv->file_statistics);
 }
 
 static void
@@ -1141,8 +1121,8 @@ gjs_coverage_set_property(GObject      *object,
     GjsCoverage *coverage = GJS_DEBUG_COVERAGE(object);
     GjsCoveragePrivate *priv = (GjsCoveragePrivate *) gjs_coverage_get_instance_private(coverage);
     switch (prop_id) {
-    case PROP_DEBUG_HOOKS:
-        priv->debug_hooks = GJS_DEBUG_HOOKS(g_value_dup_object(value));
+    case PROP_CONTEXT:
+        priv->context = GJS_CONTEXT(g_value_dup_object(value));
         break;
     case PROP_COVERAGE_PATHS:
         g_assert(priv->covered_paths == NULL);
@@ -1172,13 +1152,13 @@ gjs_coverage_dispose(GObject *object)
 {
     GjsCoverage *coverage = GJS_DEBUG_COVERAGE (object);
     GjsCoveragePrivate *priv = (GjsCoveragePrivate *) gjs_coverage_get_instance_private(coverage);
+    GjsDebugHooks *hooks = gjs_context_get_debug_hooks(priv->context);
 
-    clear_debug_handle(priv->debug_hooks, gjs_debug_hooks_remove_script_load_hook, &priv->new_scripts_connection);
-    clear_debug_handle(priv->debug_hooks, gjs_debug_hooks_remove_singlestep_hook, &priv->single_step_connection);
-    clear_debug_handle(priv->debug_hooks, gjs_debug_hooks_remove_frame_step_hook, &priv->frame_step_connection);
+    clear_debug_handle(hooks, gjs_debug_hooks_remove_script_load_hook, &priv->new_scripts_connection);
+    clear_debug_handle(hooks, gjs_debug_hooks_remove_singlestep_hook, &priv->single_step_connection);
+    clear_debug_handle(hooks, gjs_debug_hooks_remove_frame_step_hook, &priv->frame_step_connection);
 
-    g_clear_object(&priv->debug_hooks);
-    g_clear_object(&priv->reflection_context);
+    g_clear_object(&priv->context);
 
     G_OBJECT_CLASS(gjs_coverage_parent_class)->dispose(object);
 }
@@ -1205,37 +1185,27 @@ gjs_coverage_class_init (GjsCoverageClass *klass)
     object_class->finalize = gjs_coverage_finalize;
     object_class->set_property = gjs_coverage_set_property;
 
-    properties[PROP_DEBUG_HOOKS] = g_param_spec_object("debug-hooks",
-                                                       "Debug Hooks",
-                                                       "Debug Hooks",
-                                                       GJS_TYPE_DEBUG_HOOKS,
-                                                       (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE));
+    properties[PROP_CONTEXT] = g_param_spec_object("context", "", "",
+                                                   GJS_TYPE_CONTEXT,
+                                                   (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
     properties[PROP_COVERAGE_PATHS] = g_param_spec_boxed("coverage-paths",
                                                          "Coverage Paths",
                                                          "Paths (and included subdirectories) of which to perform coverage analysis",
                                                          G_TYPE_STRV,
-                                                         (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE));
+                                                         (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
     g_object_class_install_properties(object_class,
                                       PROP_N,
                                       properties);
 }
 
-/**
- * gjs_coverage_new:
- * @debug_hooks: (transfer full): A #GjsDebugHooks to register callbacks on.
- * @coverage_paths: (transfer none): A null-terminated strv of directories to generate
- * coverage_data for
- *
- * Returns: A #GjsDebugCoverage
- */
 GjsCoverage *
-gjs_coverage_new (GjsDebugHooks *debug_hooks,
-                  const char    **coverage_paths)
+gjs_coverage_new (GjsContext  *context,
+                  const char **coverage_paths)
 {
     GjsCoverage *coverage =
         GJS_DEBUG_COVERAGE(g_object_new(GJS_TYPE_DEBUG_COVERAGE,
-                                        "debug-hooks", debug_hooks,
+                                        "context", context,
                                         "coverage-paths", coverage_paths,
                                         NULL));
 

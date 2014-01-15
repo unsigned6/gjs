@@ -333,6 +333,17 @@ function deduplicate(list) {
 function expressionLinesForAST(ast) {
     let allExpressions = collectForSubNodes(ast.body, expressionLinesForNode);
     allExpressions = deduplicate(allExpressions);
-
+    allExpressions = allExpressions.sort(function(a, b) {
+        return a - b;
+    });
     return allExpressions;
+}
+
+function reflectScript(script, startLine) {
+    let ast = Reflect.parse(script, { line: startLine, loc: true });
+    return {
+        functions: functionsForAST(ast),
+        branches: branchesForAST(ast),
+        expressionLines: expressionLinesForAST(ast),
+    };
 }

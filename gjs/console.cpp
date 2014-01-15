@@ -143,8 +143,7 @@ main(int argc, char **argv)
         if (!coverage_output_path)
             g_error("--coverage-output-path is required when taking coverage statistics");
 
-        coverage = gjs_coverage_new(gjs_context_get_debug_hooks(js_context),
-                                    (const gchar **) coverage_paths);
+        coverage = gjs_coverage_new(js_context, (const gchar **) coverage_paths);
     }
 
     /* prepare command line arguments */

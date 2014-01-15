@@ -76,8 +76,7 @@ setup(GjsTestJSFixture *fix,
             g_error("GJS_UNIT_COVERAGE_OUTPUT is required when using GJS_UNIT_COVERAGE_PATHS");
         }
 
-        fix->coverage = gjs_coverage_new(gjs_context_get_debug_hooks(fix->context),
-                                         (const char **) data->coverage_paths);
+        fix->coverage = gjs_coverage_new(fix->context, (const char **) data->coverage_paths);
     }
 }
 

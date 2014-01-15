@@ -79,14 +79,8 @@ unsigned int gjs_reflected_script_get_n_lines(GjsReflectedScript *script);
 
 GType gjs_reflected_script_get_type(void);
 
-GjsReflectedScript * gjs_reflected_script_new(const char *filename,
-                                              GjsContext *reflection_context);
-
-/* Creates a "reflection context" that can be passed to the constructor of
- * gjs_reflected_script_new. This context will have the script
- * containing the functions which permit reflection pre-defined and can
- * be shared across all reflections */
-GjsContext * gjs_reflected_script_create_reflection_context();
+GjsReflectedScript * gjs_reflected_script_new(GjsContext *context,
+                                              const char *filename);
 
 G_END_DECLS
 

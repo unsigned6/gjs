@@ -28,9 +28,9 @@
 #include <gjs/reflected-script.h>
 
 typedef struct _GjsReflectedScriptTestFixture {
-    char       *temporary_js_script_filename;
-    int        temporary_js_script_open_handle;
-    GjsContext *reflection_context;
+    GjsContext *context;
+    char *temporary_js_script_filename;
+    int temporary_js_script_open_handle;
 } GjsReflectedScriptTestFixture;
 
 static void
@@ -42,7 +42,7 @@ gjs_reflected_test_fixture_set_up(gpointer      fixture_data,
     fixture->temporary_js_script_open_handle = g_file_open_tmp("mock-js-XXXXXXX.js",
                                                                &fixture->temporary_js_script_filename,
                                                                NULL);
-    fixture->reflection_context = gjs_reflected_script_create_reflection_context();
+    fixture->context = gjs_context_new();
 
     g_free(current_dir);
 }
@@ -56,7 +56,7 @@ gjs_reflected_test_fixture_tear_down(gpointer      fixture_data,
     g_free(fixture->temporary_js_script_filename);
     close(fixture->temporary_js_script_open_handle);
 
-    g_object_unref(fixture->reflection_context);
+    g_object_unref(fixture->context);
 }
 
 static void
@@ -70,8 +70,7 @@ test_reflect_creation_and_destruction(gpointer      fixture_data,
     if (write(fixture->temporary_js_script_open_handle, mock_script, strlen(mock_script) * sizeof(char)) == -1)
         g_error("Failed to write to test script");
 
-    GjsReflectedScript *script = gjs_reflected_script_new(fixture->temporary_js_script_filename,
-                                                          fixture->reflection_context);
+    GjsReflectedScript *script = gjs_reflected_script_new(fixture->context, fixture->temporary_js_script_filename);
     g_object_unref(script);
 }
 
@@ -97,13 +96,12 @@ static GjsReflectedScript *
 get_reflected_script_for(const char *script,
                          int         file,
                          const char *filename,
-                         GjsContext *reflection_context)
+                         GjsContext *context)
 {
     if (write(file, script, strlen(script) * sizeof(char)) == -1)
         g_error("Failed to write to test script");
 
-    GjsReflectedScript *reflected_script =
-        gjs_reflected_script_new(filename, reflection_context);
+    GjsReflectedScript *reflected_script = gjs_reflected_script_new(context, filename);
     return reflected_script;
 }
 
@@ -121,7 +119,7 @@ test_reflect_get_all_executable_expression_lines(gpointer      fixture_data,
     GjsReflectedScript *script = get_reflected_script_for(mock_script,
                                                           fixture->temporary_js_script_open_handle,
                                                           fixture->temporary_js_script_filename,
-                                                          fixture->reflection_context);
+                                                          fixture->context);
     unsigned int       n_executable_lines = 0;
     const unsigned int *executable_lines = gjs_reflected_script_get_expression_lines(script,
                                                                                      &n_executable_lines);
@@ -206,7 +204,7 @@ test_reflect_finds_branches(gpointer      fixture_data,
     GjsReflectedScript *script = get_reflected_script_for(mock_script,
                                                           fixture->temporary_js_script_open_handle,
                                                           fixture->temporary_js_script_filename,
-                                                          fixture->reflection_context);
+                                                          fixture->context);
     const GjsReflectedScriptBranchInfo **branches =
         gjs_reflected_script_get_branches(script);
 
@@ -289,7 +287,7 @@ test_reflect_finds_functions(gpointer      fixture_data,
     GjsReflectedScript *script = get_reflected_script_for(mock_script,
                                                           fixture->temporary_js_script_open_handle,
                                                           fixture->temporary_js_script_filename,
-                                                          fixture->reflection_context);
+                                                          fixture->context);
     const GjsReflectedScriptFunctionInfo **functions =
         gjs_reflected_script_get_functions(script);
 
@@ -320,7 +318,7 @@ test_reflect_get_n_lines(gpointer      fixture_data,
     GjsReflectedScript *script = get_reflected_script_for(mock_script,
                                                           fixture->temporary_js_script_open_handle,
                                                           fixture->temporary_js_script_filename,
-                                                          fixture->reflection_context);
+                                                          fixture->context);
     unsigned int n_lines = gjs_reflected_script_get_n_lines(script);
 
     g_assert(n_lines == 4);
@@ -342,8 +340,7 @@ test_reflect_on_nonexistent_script_returns_empty(gpointer      fixture_data,
 {
     GjsReflectedScriptTestFixture *fixture =
         (GjsReflectedScriptTestFixture *) fixture_data;
-    GjsReflectedScript *script = gjs_reflected_script_new("doesnotexist://does_not_exist",
-                                                          fixture->reflection_context);
+    GjsReflectedScript *script = gjs_reflected_script_new(fixture->context, "doesnotexist://does_not_exist");
 
     /* Make the handler shut up so that we don't get an assertion on
      * raised warnings from bad scripts */

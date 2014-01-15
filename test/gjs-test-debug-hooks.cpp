@@ -292,9 +292,7 @@ test_interrupts_are_received_on_all_executable_lines_in_single_step_mode (gpoint
     write_content_to_file_at_beginning(fixture->temporary_js_script_open_handle,
                                        mock_script);
 
-    GjsContext         *reflection_context = gjs_reflected_script_create_reflection_context();
-    GjsReflectedScript *reflected = gjs_reflected_script_new(fixture->temporary_js_script_filename,
-                                                             reflection_context);
+    GjsReflectedScript *reflected = gjs_reflected_script_new(fixture->context, fixture->temporary_js_script_filename);
     unsigned int       n_executable_lines = 0;
     const unsigned int *executable_lines =
         gjs_reflected_script_get_expression_lines(reflected, &n_executable_lines);
@@ -311,7 +309,6 @@ test_interrupts_are_received_on_all_executable_lines_in_single_step_mode (gpoint
     g_array_free(line_tracker, TRUE);
     gjs_debug_hooks_remove_singlestep_hook(fixture->debug_hooks, connection);
     g_object_unref(reflected);
-    g_object_unref(reflection_context);
 }
 
 static void

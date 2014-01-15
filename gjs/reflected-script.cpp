@@ -30,21 +30,12 @@
 #include "reflected-script-private.h"
 
 struct _GjsReflectedScriptPrivate {
-    /* External context where the reflection happens. We take
-     * a reference to it so that we can still do evaluation even
-     * if the original owner of the context goes away
-     *
-     * One important precondition is that the context needs to
-     * be "initialized" to a state that we expect it to be in,
-     * eg, we need to have loaded the infoReflect.js script
-     * and set up some global variables. If it hasn't then
-     * this will trigger an assertion */
-    GjsContext *reflection_context;
+    GjsContext *context;
 
     char *script_filename;
 
-    /* Array of strings, null-terminated */
-    GArray *all_function_names;
+    /* Array of GjsReflectedScriptFunctionInfo */
+    GArray *all_functions;
 
     /* Array of GjsReflectedScriptBranchInfo */
     GArray *all_branches;
@@ -69,47 +60,13 @@ G_DEFINE_TYPE_WITH_PRIVATE(GjsReflectedScript,
 enum {
     PROP_0,
     PROP_SCRIPT_FILENAME,
-    PROP_REFLECTION_CONTEXT,
+    PROP_CONTEXT,
     PROP_N
 };
 
 static GParamSpec *properties[PROP_N];
 
 static void ensure_script_reflected(GjsReflectedScript *script);
-
-GjsReflectedScriptBranchInfo *
-gjs_reflected_script_branch_info_new(unsigned int  branch_point,
-                                     GArray       *alternatives)
-{
-    GjsReflectedScriptBranchInfo *info = g_new0(GjsReflectedScriptBranchInfo, 1);
-    info->branch_point = branch_point;
-    info->branch_alternatives = alternatives;
-    return info;
-}
-
-void
-gjs_reflected_script_branch_info_destroy(gpointer info_data)
-{
-    GjsReflectedScriptBranchInfo *info = (GjsReflectedScriptBranchInfo *) info_data;
-    g_array_free(info->branch_alternatives, TRUE);
-    g_free(info);
-}
-
-unsigned int
-gjs_reflected_script_branch_info_get_branch_point(const GjsReflectedScriptBranchInfo *info)
-{
-    return info->branch_point;
-}
-
-const unsigned int *
-gjs_reflected_script_branch_info_get_branch_alternatives(const GjsReflectedScriptBranchInfo *info,
-                                                         unsigned int                       *n)
-{
-    g_return_val_if_fail(n, NULL);
-
-    *n = info->branch_alternatives->len;
-    return (unsigned int *) info->branch_alternatives->data;
-}
 
 GjsReflectedScriptFunctionInfo *
 gjs_reflected_script_function_info_new(char         *name,
@@ -146,13 +103,57 @@ void
 gjs_reflected_script_function_info_destroy(gpointer info_data)
 {
     GjsReflectedScriptFunctionInfo *info = (GjsReflectedScriptFunctionInfo *) info_data;
-
-    if (info->name)
-        g_free(info->name);
-
+    g_free(info->name);
     g_free(info);
 }
 
+
+GjsReflectedScriptBranchInfo *
+gjs_reflected_script_branch_info_new(unsigned int  branch_point,
+                                     GArray       *alternatives)
+{
+    GjsReflectedScriptBranchInfo *info = g_new0(GjsReflectedScriptBranchInfo, 1);
+    info->branch_point = branch_point;
+    info->branch_alternatives = alternatives;
+    return info;
+}
+
+void
+gjs_reflected_script_branch_info_destroy(gpointer info_data)
+{
+    GjsReflectedScriptBranchInfo *info = (GjsReflectedScriptBranchInfo *) info_data;
+    g_array_free(info->branch_alternatives, TRUE);
+    g_free(info);
+}
+
+unsigned int
+gjs_reflected_script_branch_info_get_branch_point(const GjsReflectedScriptBranchInfo *info)
+{
+    return info->branch_point;
+}
+
+const unsigned int *
+gjs_reflected_script_branch_info_get_branch_alternatives(const GjsReflectedScriptBranchInfo *info,
+                                                         unsigned int                       *n)
+{
+    g_return_val_if_fail(n, NULL);
+
+    *n = info->branch_alternatives->len;
+    return (unsigned int *) info->branch_alternatives->data;
+}
+
+const GjsReflectedScriptFunctionInfo **
+gjs_reflected_script_get_functions(GjsReflectedScript *script)
+{
+    g_return_val_if_fail(script, NULL);
+
+    GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
+
+    ensure_script_reflected(script);
+
+    g_assert(priv->all_functions);
+    return (const GjsReflectedScriptFunctionInfo **) priv->all_functions->data;
+}
 
 const GjsReflectedScriptBranchInfo **
 gjs_reflected_script_get_branches(GjsReflectedScript *script)
@@ -165,19 +166,6 @@ gjs_reflected_script_get_branches(GjsReflectedScript *script)
 
     g_assert(priv->all_branches);
     return (const GjsReflectedScriptBranchInfo **) priv->all_branches->data;\
-}
-
-const GjsReflectedScriptFunctionInfo **
-gjs_reflected_script_get_functions(GjsReflectedScript *script)
-{
-    g_return_val_if_fail(script, NULL);
-
-    GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
-
-    ensure_script_reflected(script);
-
-    g_assert(priv->all_function_names);
-    return (const GjsReflectedScriptFunctionInfo **) priv->all_function_names->data;
 }
 
 const unsigned int *
@@ -206,8 +194,8 @@ static gboolean
 get_array_from_js_value(JSContext             *context,
                         jsval                 *value,
                         size_t                 array_element_size,
-                        GDestroyNotify         element_clear_func,
                         ConvertAndInsertJSVal  inserter,
+                        GDestroyNotify         element_clear_func,
                         GArray                **out_array)
 {
     g_return_val_if_fail(out_array != NULL, FALSE);
@@ -254,33 +242,19 @@ get_array_from_js_value(JSContext             *context,
     return TRUE;
 }
 
-static GArray *
-call_js_function_for_array_return(JSContext             *context,
-                                  JSObject              *object,
-                                  size_t                 array_element_size,
-                                  GDestroyNotify         element_clear_func,
-                                  ConvertAndInsertJSVal  inserter,
-                                  const char            *function_name,
-                                  jsval                 *ast)
+static gboolean
+convert_and_insert_unsigned_int(GArray    *array,
+                                JSContext *context,
+                                jsval     *element)
 {
-    GArray *array = NULL;
-    jsval rval;
-    if (!JS_CallFunctionName(context, object, function_name, 1, ast, &rval)) {
-        gjs_log_exception(context);
-        return NULL;
+    if (!JSVAL_IS_INT(*element)) {
+        g_critical("Array element is not an integer");
+        return FALSE;
     }
 
-    if (!get_array_from_js_value(context,
-                                 &rval,
-                                 array_element_size,
-                                 element_clear_func,
-                                 inserter,
-                                 &array)) {
-        gjs_log_exception(context);
-        return NULL;
-    }
-
-    return array;
+    unsigned int element_integer = JSVAL_TO_INT(*element);
+    g_array_append_val(array, element_integer);
+    return TRUE;
 }
 
 static void
@@ -292,7 +266,7 @@ clear_reflected_script_function_info(gpointer info_location)
 }
 
 static gboolean
-convert_and_insert_function_decl(GArray    *array,
+convert_and_insert_function_info(GArray    *array,
                                  JSContext *context,
                                  jsval     *element)
 {
@@ -355,65 +329,8 @@ convert_and_insert_function_decl(GArray    *array,
     return TRUE;
 }
 
-static GArray *
-get_script_functions_from_reflection(JSContext *context,
-                                     JSObject  *global,
-                                     jsval     *ast)
-{
-    return call_js_function_for_array_return(context,
-                                             global,
-                                             sizeof(GjsReflectedScriptFunctionInfo *),
-                                             clear_reflected_script_function_info,
-                                             convert_and_insert_function_decl,
-                                             "functionsForAST",
-                                             ast);
-}
-
-static gboolean
-convert_and_insert_unsigned_int(GArray    *array,
-                                JSContext *context,
-                                jsval     *element)
-{
-    if (!JSVAL_IS_INT(*element)) {
-        g_critical("Array element is not an integer");
-        return FALSE;
-    }
-
-    unsigned int element_integer = JSVAL_TO_INT(*element);
-    g_array_append_val(array, element_integer);
-    return TRUE;
-}
-
-static int
-uint_compare(gconstpointer left,
-             gconstpointer right)
-{
-    unsigned int *left_int = (unsigned int *) left;
-    unsigned int *right_int = (unsigned int *) right;
-
-    return *left_int - *right_int;
-}
-
-static GArray *
-get_all_lines_with_executable_expressions_from_reflection(JSContext *context,
-                                                          JSObject  *global,
-                                                          jsval     *ast)
-{
-    GArray *all_expressions = call_js_function_for_array_return(context,
-                                                                global,
-                                                                sizeof(unsigned int),
-                                                                NULL,
-                                                                convert_and_insert_unsigned_int,
-                                                                "expressionLinesForAST",
-                                                                ast);
-
-    /* Sort, just to be sure */
-    g_array_sort(all_expressions, uint_compare);
-    return all_expressions;
-}
-
 static void
-gjs_reflected_script_branch_info_clear(gpointer branch_info_location)
+clear_reflected_script_branch_info(gpointer branch_info_location)
 {
     GjsReflectedScriptBranchInfo **info_ptr = (GjsReflectedScriptBranchInfo **) branch_info_location;
     gjs_reflected_script_branch_info_destroy(*info_ptr);
@@ -456,12 +373,8 @@ convert_and_insert_branch_info(GArray    *array,
         return FALSE;
     }
 
-    if (!get_array_from_js_value(context,
-                                 &branch_exits_value,
-                                 sizeof(unsigned int),
-                                 NULL,
-                                 convert_and_insert_unsigned_int,
-                                 &branch_exists_array)) {
+    if (!get_array_from_js_value(context, &branch_exits_value, sizeof(unsigned int),
+                                 convert_and_insert_unsigned_int, NULL, &branch_exists_array)) {
         /* Already logged the exception, no need to do anything here */
         return FALSE;
     }
@@ -472,20 +385,6 @@ convert_and_insert_branch_info(GArray    *array,
     g_array_append_val(array, info);
 
     return TRUE;
-}
-
-static GArray *
-get_script_branches_from_reflection(JSContext *context,
-                                    JSObject  *global,
-                                    jsval     *ast)
-{
-    return call_js_function_for_array_return(context,
-                                             global,
-                                             sizeof(GjsReflectedScriptBranchInfo *),
-                                             gjs_reflected_script_branch_info_clear,
-                                             convert_and_insert_branch_info,
-                                             "branchesForAST",
-                                             ast);
 }
 
 static unsigned int
@@ -545,14 +444,13 @@ load_script_for_reflection(GjsContext   *context,
 }
 
 static gboolean
-perform_reflection_within_compartment(GjsContext         *internal_context,
-                                      GjsReflectedScript *script)
+perform_reflection(GjsContext         *internal_context,
+                   GjsReflectedScript *script)
 {
     GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
-    JSContext *js_context = (JSContext *) gjs_context_get_native_context(internal_context);
-    JSObject *global = JS_GetGlobalObject(js_context);
-
-    JSAutoCompartment ac(js_context, global);
+    JSContext *context = (JSContext *) gjs_context_get_native_context(internal_context);
+    JSObject *global = JS_GetGlobalObject(context);
+    JSAutoCompartment ac(context, global);
 
     int          start_line_number = 1;
     unsigned int script_n_lines;
@@ -565,42 +463,47 @@ perform_reflection_within_compartment(GjsContext         *internal_context,
     if (!str)
         return FALSE;
 
-    jsval reflect_object_value;
-    if (!JS_GetProperty(js_context, global, "Reflect", &reflect_object_value) ||
-        !JSVAL_IS_OBJECT(reflect_object_value)) {
-        gjs_throw(js_context, "'Reflect' object not found in context");
+    jsval reflectScript;
+    if (!gjs_eval_with_scope(context, NULL,
+                             "imports.infoReflect.reflectScript", -1,
+                             "<reflect>", &reflectScript))
         return FALSE;
-    }
 
-    JSObject *reflect_object = JSVAL_TO_OBJECT(reflect_object_value);
-    JSObject *reflect_options_object = JS_NewObject(js_context, NULL, NULL, NULL);
-
-    jsval loc_value = BOOLEAN_TO_JSVAL(JS_TRUE);
-    jsval line_value = INT_TO_JSVAL(start_line_number);
-
-    JS_SetProperty(js_context, reflect_options_object, "loc", &loc_value);
-    JS_SetProperty(js_context, reflect_options_object, "line", &line_value);
-
-    jsval parseArgv[] = {
+    jsval reflectScriptArgs[] = {
         STRING_TO_JSVAL(str),
-        OBJECT_TO_JSVAL(reflect_options_object)
+        INT_TO_JSVAL(start_line_number),
     };
-    jsval ast_value;
-
-    if (!JS_CallFunctionName(js_context, reflect_object, "parse", 2, parseArgv, &ast_value)) {
-        gjs_throw(js_context, "Failed to call Reflect.parse");
+    jsval reflectScriptRetval;
+    if (!JS_CallFunctionValue(context, NULL, reflectScript,
+                              G_N_ELEMENTS(reflectScriptArgs), reflectScriptArgs,
+                              &reflectScriptRetval))
         return FALSE;
-    }
 
-    priv->all_function_names = get_script_functions_from_reflection(js_context,
-                                                                    global,
-                                                                    &ast_value);
-    priv->all_branches = get_script_branches_from_reflection(js_context,
-                                                             global,
-                                                             &ast_value);
-    priv->all_expression_lines = get_all_lines_with_executable_expressions_from_reflection(js_context,
-                                                                                           global,
-                                                                                           &ast_value);
+    g_assert(reflectScriptRetval.isObject());
+
+    JSObject *reflectScriptObj = &reflectScriptRetval.toObject();
+
+    jsval functions;
+    if (!JS_GetProperty(context, reflectScriptObj, "functions", &functions))
+        return FALSE;
+    if (!get_array_from_js_value(context, &functions, sizeof(GjsReflectedScriptFunctionInfo *),
+                                 convert_and_insert_function_info, clear_reflected_script_function_info, &priv->all_functions))
+        return FALSE;
+
+    jsval branches;
+    if (!JS_GetProperty(context, reflectScriptObj, "branches", &branches))
+        return FALSE;
+    if (!get_array_from_js_value(context, &branches, sizeof(GjsReflectedScriptBranchInfo *),
+                                 convert_and_insert_branch_info, clear_reflected_script_branch_info, &priv->all_branches))
+        return FALSE;
+
+    jsval expressionLines;
+    if (!JS_GetProperty(context, reflectScriptObj, "expressionLines", &expressionLines))
+        return FALSE;
+    if (!get_array_from_js_value(context, &expressionLines, sizeof(unsigned int),
+                                 convert_and_insert_unsigned_int, NULL, &priv->all_expression_lines))
+        return FALSE;
+
     priv->n_lines = script_n_lines;
 
     return TRUE;
@@ -614,37 +517,17 @@ ensure_script_reflected(GjsReflectedScript *script)
     if (priv->reflection_performed)
         return;
 
-    if (!perform_reflection_within_compartment(priv->reflection_context, script)) {
+    if (!perform_reflection(priv->context, script)) {
         g_warning("Reflecting script %s failed", priv->script_filename);
         /* If the reflection failed, we should make sure that the the reflection
          * details have sane defaults */
+        priv->all_functions = g_array_new(TRUE, TRUE, sizeof(GjsReflectedScriptFunctionInfo));
         priv->all_branches = g_array_new(TRUE, TRUE, sizeof(GjsReflectedScriptBranchInfo));
-        priv->all_function_names = g_array_new(TRUE, TRUE, sizeof(GjsReflectedScriptFunctionInfo));
         priv->all_expression_lines = g_array_new(TRUE, TRUE, sizeof(unsigned int));
         priv->n_lines = 0;
     }
 
     priv->reflection_performed = TRUE;
-}
-
-GjsContext *
-gjs_reflected_script_create_reflection_context()
-{
-    static const char *resource_path = "resource:///org/gnome/gjs/modules/infoReflect.js";
-
-    GjsContext *context = gjs_context_new();
-
-    if (!gjs_context_eval_file(context,
-                               resource_path,
-                               NULL,
-                               NULL)) {
-        g_object_unref(context);
-        return NULL;
-    }
-
-    gjs_context_pop();
-
-    return context;
 }
 
 unsigned int
@@ -664,8 +547,8 @@ gjs_reflected_script_init(GjsReflectedScript *script)
 {
     GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
 
+    priv->all_functions = NULL;
     priv->all_branches = NULL;
-    priv->all_function_names = NULL;
     priv->all_expression_lines = NULL;
 }
 
@@ -682,7 +565,7 @@ gjs_reflected_script_dispose(GObject *object)
     GjsReflectedScript *script = GJS_REFLECTED_SCRIPT(object);
     GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
 
-    g_clear_object(&priv->reflection_context);
+    g_clear_object(&priv->context);
 
     G_OBJECT_CLASS(gjs_reflected_script_parent_class)->dispose(object);
 }
@@ -693,8 +576,8 @@ gjs_reflected_script_finalize(GObject *object)
     GjsReflectedScript *script = GJS_REFLECTED_SCRIPT(object);
     GjsReflectedScriptPrivate *priv = (GjsReflectedScriptPrivate *) gjs_reflected_script_get_instance_private(script);
 
+    unref_array_if_nonnull(priv->all_functions);
     unref_array_if_nonnull(priv->all_branches);
-    unref_array_if_nonnull(priv->all_function_names);
     unref_array_if_nonnull(priv->all_expression_lines);
 
     g_free(priv->script_filename);
@@ -715,8 +598,8 @@ gjs_reflected_script_set_property(GObject      *object,
     case PROP_SCRIPT_FILENAME:
         priv->script_filename = g_value_dup_string(value);
         break;
-    case PROP_REFLECTION_CONTEXT:
-        priv->reflection_context = (GjsContext *) g_value_dup_object(value);
+    case PROP_CONTEXT:
+        priv->context = (GjsContext *) g_value_dup_object(value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -737,26 +620,23 @@ gjs_reflected_script_class_init(GjsReflectedScriptClass *klass)
                                                            "Script Filename",
                                                            "Valid path to script",
                                                            NULL,
-                                                           (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE));
-    properties[PROP_REFLECTION_CONTEXT] = g_param_spec_object("reflection-context",
-                                                              "Reflection Context",
-                                                              "Context to perform reflection in. "
-                                                              "This must have been initialized with infoReflect.js loaded ",
-                                                              GJS_TYPE_CONTEXT,
-                                                              (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE));
+                                                           (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+    properties[PROP_CONTEXT] = g_param_spec_object("context", "", "",
+                                                   GJS_TYPE_CONTEXT,
+                                                   (GParamFlags) (G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
     g_object_class_install_properties(object_class,
                                       PROP_N,
                                       properties);
 }
 
 GjsReflectedScript *
-gjs_reflected_script_new(const char *filename,
-                         GjsContext *reflection_context)
+gjs_reflected_script_new(GjsContext *context,
+                         const char *filename)
 {
     GjsReflectedScript *script =
         GJS_REFLECTED_SCRIPT(g_object_new(GJS_TYPE_REFLECTED_SCRIPT,
+                                          "context", context,
                                           "filename", filename,
-                                          "reflection-context", reflection_context,
                                           NULL));
     return script;
 }
