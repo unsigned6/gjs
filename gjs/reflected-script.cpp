@@ -194,10 +194,8 @@ gjs_reflected_script_get_expression_lines(GjsReflectedScript *script,
     ensure_script_reflected(script);
 
     g_assert(priv->all_expression_lines);
-    if (priv->all_expression_lines) {
-        *n = priv->all_expression_lines->len;
-        return (const unsigned int *) priv->all_expression_lines->data;
-    }
+    *n = priv->all_expression_lines->len;
+    return (const unsigned int *) priv->all_expression_lines->data;
 }
 
 typedef gboolean (*ConvertAndInsertJSVal) (GArray    *array,
