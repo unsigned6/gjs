@@ -2773,11 +2773,71 @@ gjs_signal_new(JSContext *cx,
     return ret;
 }
 
+static JSBool
+gjs_define_enum_gtype(JSContext *cx,
+                      unsigned   argc,
+                      jsval     *vp)
+{
+    JS::CallArgs argv = JS::CallArgsFromVp (argc, vp);
+    JSBool ret = FALSE;
+    g_autofree char *enum_name = NULL;
+    JSObject *obj, *props_iter;
+    jsid prop_id;
+    jsval value;
+    GArray *arr;
+    GType gtype;
+
+    JS_BeginRequest(cx);
+
+    if (argc != 2)
+        return JS_FALSE;
+
+    if (!gjs_string_to_utf8(cx, argv[0], &enum_name))
+        goto out;
+
+    obj = JSVAL_TO_OBJECT(argv[1]);
+
+    props_iter = JS_NewPropertyIterator(cx, obj);
+    prop_id = JSID_VOID;
+
+    arr = g_array_new(FALSE, TRUE, sizeof(GEnumValue));
+
+    do {
+        GEnumValue v = {};
+        char *name = NULL;
+        jsval propval;
+
+        if (!JS_NextProperty(cx, props_iter, &prop_id))
+            break;
+
+        if (!gjs_get_string_id(cx, prop_id, &name))
+            continue;
+        if (!JS_GetPropertyById(cx, obj, prop_id, &propval))
+            continue;
+        if (!JSVAL_IS_INT(propval))
+            continue;
+
+        v.value_name = name;
+        v.value_nick = name;
+        v.value = JSVAL_TO_INT(propval);
+
+        g_array_append_val(arr, v);
+    } while (!JSID_IS_VOID(prop_id));
+
+    gtype = g_enum_register_static(enum_name, (const GEnumValue *) g_array_free(arr, FALSE));
+    value = OBJECT_TO_JSVAL(gjs_gtype_create_gtype_wrapper(cx, gtype));
+    JS_DefineProperty(cx, obj, "$gtype", value, NULL, NULL, JSPROP_PERMANENT);
+ out:
+    JS_EndRequest(cx);
+    return ret;
+}
+
 static JSFunctionSpec module_funcs[] = {
     { "register_type", JSOP_WRAPPER ((JSNative) gjs_register_type), 4, GJS_MODULE_PROP_FLAGS },
     { "add_interface", JSOP_WRAPPER ((JSNative) gjs_add_interface), 2, GJS_MODULE_PROP_FLAGS },
     { "hook_up_vfunc", JSOP_WRAPPER ((JSNative) gjs_hook_up_vfunc), 3, GJS_MODULE_PROP_FLAGS },
     { "signal_new", JSOP_WRAPPER ((JSNative) gjs_signal_new), 6, GJS_MODULE_PROP_FLAGS },
+    { "define_enum_gtype", JSOP_WRAPPER ((JSNative) gjs_define_enum_gtype), 2, GJS_MODULE_PROP_FLAGS },
     { NULL },
 };
 
