@@ -792,3 +792,57 @@ gjs_get_import_global(JSContext *context)
     GjsContext *gjs_context = (GjsContext *) JS_GetContextPrivate(context);
     return gjs_context->global;
 }
+
+G_CONST_RETURN char * G_CONST_RETURN *
+gjs_get_search_path(void)
+{
+    static char **gjs_search_path;
+    char **search_path;
+
+    /* not thread safe */
+
+    if (!gjs_search_path) {
+        G_CONST_RETURN gchar* G_CONST_RETURN * system_data_dirs;
+        const char *envstr;
+        GPtrArray *path;
+        gsize i;
+
+        path = g_ptr_array_new();
+
+        /* in order of priority */
+
+        /* $GJS_PATH */
+        envstr = g_getenv("GJS_PATH");
+        if (envstr) {
+            char **dirs, **d;
+            dirs = g_strsplit(envstr, G_SEARCHPATH_SEPARATOR_S, 0);
+            for (d = dirs; *d != NULL; d++)
+                g_ptr_array_add(path, *d);
+            /* we assume the array and strings are allocated separately */
+            g_free(dirs);
+        }
+
+        g_ptr_array_add(path, g_strdup("resource:///org/gnome/gjs/modules/"));
+
+        /* $XDG_DATA_DIRS /gjs-1.0 */
+        system_data_dirs = g_get_system_data_dirs();
+        for (i = 0; system_data_dirs[i] != NULL; ++i) {
+            char *s;
+            s = g_build_filename(system_data_dirs[i], "gjs-1.0", NULL);
+            g_ptr_array_add(path, s);
+        }
+
+        /* ${datadir}/share/gjs-1.0 */
+        g_ptr_array_add(path, g_strdup(GJS_JS_DIR));
+
+        g_ptr_array_add(path, NULL);
+
+        search_path = (char**)g_ptr_array_free(path, FALSE);
+
+        gjs_search_path = search_path;
+    } else {
+        search_path = gjs_search_path;
+    }
+
+    return (G_CONST_RETURN char * G_CONST_RETURN *)search_path;
+}
